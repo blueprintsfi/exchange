@@ -6,6 +6,7 @@ import {IBlueprintManager} from "core/interfaces/IBlueprintManager.sol";
 import {BlueprintManager} from "core/BlueprintManager.sol"; // todo: change to interface and add transfers to the interface
 import {BasicBlueprint, TokenOp} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
+import {IFexEvents} from "./interfaces/IFexEvents.sol";
 
 struct Swap {
 	address holder;
@@ -27,7 +28,7 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract fExchange is BasicBlueprint {
+contract fExchange is BasicBlueprint, IFexEvents {
 	mapping (address holder =>
 		mapping (uint256 tokenId =>
 			mapping (address operator =>
@@ -58,7 +59,7 @@ contract fExchange is BasicBlueprint {
 		for (uint256 i = 0; i < len; i++)
 			balances[depositFor][deposits[i].tokenId][operator][delay] += deposits[i].amount;
 
-		// todo: add events?
+		emit Deposit(depositFor, operator, delay, deposits);
 
 		return (zero(), zero(), zero(), deposits);
 	}
@@ -67,13 +68,13 @@ contract fExchange is BasicBlueprint {
 		// todo: custom error
 		require(ragequitTime[msg.sender][operator][delay] == 0);
 		ragequitTime[msg.sender][operator][delay] = block.timestamp;
-		// todo: add event
+		emit RageQuit(msg.sender, operator, delay, block.timestamp);
 	}
 
 	function unragequit(address operator, uint256 delay) external {
 		require(ragequitTime[msg.sender][operator][delay] != 0);
 		ragequitTime[msg.sender][operator][delay] = 0;
-		// todo: add event
+		emit UnrageQuit(msg.sender, operator, delay);
 	}
 
 	function rageWithdraw(address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
@@ -126,7 +127,7 @@ contract fExchange is BasicBlueprint {
 		require(fill[msg.sender][orderId] == 0);
 		fill[msg.sender][orderId] = 1;
 
-		// todo: add event
+		emit OrderSigned(msg.sender, orderId);
 		// todo: how will we know the details? emitted by a contract or here, with the whole order as the argument?
 	}
 
