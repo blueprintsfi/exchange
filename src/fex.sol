@@ -28,7 +28,32 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract fExchange is BasicBlueprint, IFexEvents {
+contract fExchange is BasicBlueprint {
+	/// @notice Emitted when tokens are deposited into the exchange
+	/// @param depositFor The address receiving the deposit
+	/// @param operator The operator address
+	/// @param delay The delay period for the deposit
+	/// @param deposits Array of token operations containing deposit details
+	event Deposit(address indexed depositFor, address indexed operator, uint256 indexed delay, TokenOp[] deposits);
+
+	/// @notice Emitted when a user initiates ragequit
+	/// @param holder The address initiating ragequit
+	/// @param operator The operator address
+	/// @param delay The delay period
+	/// @param timestamp When the ragequit was initiated
+	event Ragequit(address indexed holder, address indexed operator, uint256 indexed delay, uint256 timestamp);
+
+	/// @notice Emitted when a user cancels their ragequit
+	/// @param holder The address canceling ragequit
+	/// @param operator The operator address
+	/// @param delay The delay period
+	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay);
+
+	/// @notice Emitted when an order is signed
+	/// @param holder The address signing the order
+	/// @param orderId The unique identifier of the order
+	event OrderSigned(address indexed holder, bytes32 indexed orderId);
+
 	mapping (address holder =>
 		mapping (uint256 tokenId =>
 			mapping (address operator =>
@@ -68,13 +93,13 @@ contract fExchange is BasicBlueprint, IFexEvents {
 		// todo: custom error
 		require(ragequitTime[msg.sender][operator][delay] == 0);
 		ragequitTime[msg.sender][operator][delay] = block.timestamp;
-		emit RageQuit(msg.sender, operator, delay, block.timestamp);
+		emit Ragequit(msg.sender, operator, delay, block.timestamp);
 	}
 
 	function unragequit(address operator, uint256 delay) external {
 		require(ragequitTime[msg.sender][operator][delay] != 0);
 		ragequitTime[msg.sender][operator][delay] = 0;
-		emit UnrageQuit(msg.sender, operator, delay);
+		emit Unragequit(msg.sender, operator, delay);
 	}
 
 	function rageWithdraw(address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
@@ -128,7 +153,6 @@ contract fExchange is BasicBlueprint, IFexEvents {
 		fill[msg.sender][orderId] = 1;
 
 		emit OrderSigned(msg.sender, orderId);
-		// todo: how will we know the details? emitted by a contract or here, with the whole order as the argument?
 	}
 
 	function initCancel(bytes32[] calldata orderIds) external {
