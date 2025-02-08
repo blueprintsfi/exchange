@@ -21,6 +21,12 @@ struct SwapExecution {
 	uint256 output;
 }
 
+struct UserData {
+	mapping (uint256 tokenId => uint256 balance) balances;
+	uint256 nonce;
+	uint256 ragequitTime;
+}
+
 function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 	res = 0;
 	for (uint256 i = 0; i < ops.length; i++)
@@ -54,15 +60,8 @@ contract fExchange is BasicBlueprint {
 	event OrderSigned(address indexed holder, bytes32 indexed orderId);
 
 	mapping (address holder =>
-		mapping (uint256 tokenId =>
-			mapping (address operator =>
-				mapping (uint256 delay => uint256 balance)))) public balances;
-	mapping (address holder =>
 		mapping (address operator =>
-			mapping (uint256 delay => uint256 withdrawalNonce))) public nonces;
-	mapping (address holder =>
-		mapping (address operator =>
-			mapping (uint256 delay => uint256 timestamp))) public ragequitTime;
+			mapping (uint256 delay => UserData data))) public userData;
 	mapping (address holder => mapping (bytes32 orderId => uint256 filled)) public fill;
 	mapping (address holder => mapping (bytes32 orderId => uint256 timestamp)) public cancelled;
 
@@ -81,7 +80,7 @@ contract fExchange is BasicBlueprint {
 
 		uint256 len = deposits.length;
 		for (uint256 i = 0; i < len; i++)
-			balances[depositFor][deposits[i].tokenId][operator][delay] += deposits[i].amount;
+			userData[depositFor][operator][delay].balances[deposits[i].tokenId] += deposits[i].amount;
 
 		emit Deposit(depositFor, operator, delay, deposits);
 
@@ -90,20 +89,20 @@ contract fExchange is BasicBlueprint {
 
 	function ragequit(address operator, uint256 delay) external {
 		// todo: custom error
-		require(ragequitTime[msg.sender][operator][delay] == 0);
-		ragequitTime[msg.sender][operator][delay] = block.timestamp;
+		require(userData[msg.sender][operator][delay].ragequitTime == 0);
+		userData[msg.sender][operator][delay].ragequitTime = block.timestamp;
 		emit Ragequit(msg.sender, operator, delay, block.timestamp);
 	}
 
 	function unragequit(address operator, uint256 delay) external {
-		require(ragequitTime[msg.sender][operator][delay] != 0);
-		ragequitTime[msg.sender][operator][delay] = 0;
+		require(userData[msg.sender][operator][delay].ragequitTime != 0);
+		userData[msg.sender][operator][delay].ragequitTime = 0;
 		emit Unragequit(msg.sender, operator, delay);
 	}
 
 	function rageWithdraw(address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
 		// todo: custom error
-		uint256 ts = ragequitTime[msg.sender][operator][delay];
+		uint256 ts = userData[msg.sender][operator][delay].ragequitTime;
 		require(ts + delay < block.timestamp);
 		require(ts != 0);
 
@@ -111,7 +110,7 @@ contract fExchange is BasicBlueprint {
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			balances[msg.sender][tokenId][operator][delay] -= amount;
+			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
 			// todo: create a batch transfer in Blueprint Manager using a TokenOp array
 			BlueprintManager(address(blueprintManager)).transfer(msg.sender, tokenId, amount); // todo: ughh use interface
 		}
@@ -134,14 +133,14 @@ contract fExchange is BasicBlueprint {
 			keccak256(abi.encode(holder, delay, nonce, withdrawals)),
 			signature
 		));
-		require(nonces[holder][operator][delay] < nonce);
-		nonces[holder][operator][delay] = nonce;
+		require(userData[holder][operator][delay].nonce < nonce);
+		userData[holder][operator][delay].nonce = nonce;
 
 		uint256 len = withdrawals.length;
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			balances[msg.sender][tokenId][operator][delay] -= amount;
+			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
 			// todo: create a batch transfer in Blueprint Manager using a TokenOp array
 			BlueprintManager(address(blueprintManager)).transfer(msg.sender, tokenId, amount); // todo: ughh use interface
 		}
@@ -229,16 +228,16 @@ contract fExchange is BasicBlueprint {
 			for (uint256 j = 0; j < inputs.length; j++) { // todo: use flash accounting
 				(uint256 tokenId, uint256 amount) = (inputs[j].tokenId, inputs[j].amount);
 				amount = amount / amountInGcd * amountIn;
-				balances[swap.holder][tokenId][msg.sender][swap.delay] -= amount;
-				balances[msg.sender][tokenId][msg.sender][0] += amount;
+				userData[swap.holder][msg.sender][swap.delay].balances[tokenId] -= amount;
+				userData[msg.sender][msg.sender][0].balances[tokenId] += amount;
 			}
 
 			TokenOp[] calldata outputs = swap.outputs;
 			for (uint256 j = 0; j < outputs.length; j++) { // todo: use flash accounting
 				(uint256 tokenId, uint256 amount) = (outputs[j].tokenId, outputs[j].amount);
 				amount = amount / amountOutGcd * swapEx.output;
-				balances[swap.holder][tokenId][msg.sender][swap.delay] += amount;
-				balances[msg.sender][tokenId][msg.sender][0] -= amount; // todo: extremely important to use flash accounting here
+				userData[swap.holder][msg.sender][swap.delay].balances[tokenId] += amount;
+				userData[msg.sender][msg.sender][0].balances[tokenId] -= amount; // todo: extremely important to use flash accounting here
 			}
 		}
 	}
