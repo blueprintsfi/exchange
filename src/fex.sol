@@ -6,7 +6,6 @@ import {IBlueprintManager} from "core/interfaces/IBlueprintManager.sol";
 import {BlueprintManager} from "core/BlueprintManager.sol"; // todo: change to interface and add transfers to the interface
 import {BasicBlueprint, TokenOp} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
-import {IFexEvents} from "./interfaces/IFexEvents.sol";
 
 struct Swap {
 	address holder;
