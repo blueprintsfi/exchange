@@ -13,8 +13,8 @@ struct Swap {
 	address operator;
 	uint256 deadlineAndNonce;
 	uint256 delay;
-	TokenOp[] inputs; //  [A: 20, B: 35] ;;  gcd = 5  ;;   [4, 7]
-	TokenOp[] outputs; // [C: 35, D: 14] ;;  gcd = 7 ;;   [5, 2]   ;;    [20, 3]
+	TokenOp[] inputs;
+	TokenOp[] outputs;
 }
 
 struct SwapExecution {
@@ -244,32 +244,3 @@ contract fExchange is BasicBlueprint {
 		}
 	}
 }
-
-
-
-// deposits:
-// 	- (done) through cook
-// 	- (should we?) through approvals/operators
-// - withdrawals:
-// 	- (done) force withdrawal process // withdraw
-// 	- (done) with operator's signature
-// - swaps:
-// 	- (done) many to many like a basket
-// - cancellations:
-// 	- (done) by operator
-// 	- (done) by user, with delay
-
-
-
-
-
-
-
-
-// history
-// - swaps:
-// 	- one to one, many to one, one to many, maybe many to many?
-
-
-
-
