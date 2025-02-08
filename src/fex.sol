@@ -10,10 +10,20 @@ import {gcd} from "core/libraries/Math.sol";
 struct Swap {
 	address holder;
 	address operator;
-	uint256 deadlineAndNonce;
 	uint256 delay;
+	address subaccount;
+	uint256 deadlineAndNonce;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
+}
+
+struct Permit {
+	address holder;
+	address operator;
+	uint256 delay;
+	address subaccount;
+	uint256 deadlineAndNonce;
+	TokenOp[] tokens;
 }
 
 struct SwapExecution {
@@ -23,6 +33,8 @@ struct SwapExecution {
 
 struct UserData {
 	mapping (uint256 tokenId => uint256 balance) balances;
+	mapping (address subaccount => mapping (uint256 tokenId => uint256 allowance)) allowed;
+	mapping (address subaccount => bool deactivated) deactivated;
 	uint256 nonce;
 	uint256 ragequitTime;
 }
@@ -62,8 +74,8 @@ contract fExchange is BasicBlueprint {
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
-	mapping (address holder => mapping (bytes32 orderId => uint256 filled)) public fill;
-	mapping (address holder => mapping (bytes32 orderId => uint256 timestamp)) public cancelled;
+	mapping (address signer => mapping (bytes32 orderId => uint256 filled)) public fill;
+	mapping (address signer => mapping (bytes32 orderId => uint256 timestamp)) public cancelled;
 
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager) {}
@@ -171,6 +183,31 @@ contract fExchange is BasicBlueprint {
 		}
 	}
 
+	function setActivationStatus(
+		address operator,
+		uint256 delay,
+		address[] calldata subaccounts,
+		bool[] calldata status
+	) external {
+		require(subaccounts.length == status.length);
+
+		for (uint256 i = 0; i < subaccounts.length; i++)
+			userData[msg.sender][operator][delay].deactivated[subaccounts[i]] = status[i];
+
+		// todo: add event
+	}
+
+	function operatorDeactivate( // todo: batch with other actions?
+		address holder,
+		uint256 delay,
+		address[] calldata subaccounts
+	) external {
+		for (uint256 i = 0; i < subaccounts.length; i++)
+			userData[holder][msg.sender][delay].deactivated[subaccounts[i]] = true;
+
+		// todo: add event
+	}
+
 	function operatorCancel(Swap[] calldata swaps) external {
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i];
@@ -178,6 +215,23 @@ contract fExchange is BasicBlueprint {
 			bytes32 orderId = keccak256(abi.encode(swap));
 			fill[swap.holder][orderId] = type(uint256).max;
 		}
+	}
+
+	function approveSubaccount(Permit calldata permit, bytes calldata signature) external { // todo: in a batch? only operator?
+		if (msg.sender != permit.holder) {
+			require(msg.sender == permit.operator);
+			require(SignatureCheckerLib.isValidSignatureNowCalldata(
+				permit.holder,
+				keccak256(abi.encode(permit)),
+				signature
+			));
+		}
+		require(block.timestamp <= (permit.deadlineAndNonce >> 128));
+		UserData storage userState = userData[permit.holder][permit.operator][permit.delay];
+
+		TokenOp[] calldata tokens = permit.tokens;
+		for (uint256 i = 0; i < tokens.length; i++)
+			userState.allowed[permit.subaccount][tokens[i].tokenId] += tokens[i].amount;
 	}
 
 	function getSwapData(Swap calldata swap, uint256 previousFill, uint256 newFill) internal pure returns (
@@ -197,19 +251,24 @@ contract fExchange is BasicBlueprint {
 	}
 
 	function executeSwaps(SwapExecution[] calldata swaps, bytes[] calldata signatures) external {
+		UserData storage operatorState = userData[msg.sender][msg.sender][0];
 		for (uint256 i = 0; i < swaps.length; i++) {
 			SwapExecution calldata swapEx = swaps[i];
 			Swap calldata swap = swapEx.swap;
+			address account = swap.subaccount;
+			address holder = swap.holder;
+			address signer = account == address(0) ? holder : account;
+			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
 			bytes32 orderId = keccak256(abi.encode(swap));
 
 			require(block.timestamp <= (swap.deadlineAndNonce >> 128));
 			require(swap.operator == msg.sender); // todo: operator shouldn't be in calldata then
 
-			uint256 previousFill = fill[swap.holder][orderId];
+			uint256 previousFill = fill[signer][orderId];
 
 			if (previousFill == 0) {
 				require(SignatureCheckerLib.isValidSignatureNowCalldata(
-					swap.holder,
+					signer,
 					orderId,
 					signatures[i]
 				));
@@ -217,27 +276,36 @@ contract fExchange is BasicBlueprint {
 				previousFill--;
 			}
 			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
-			fill[swap.holder][orderId] = newFill + 1;
+			fill[signer][orderId] = newFill + 1;
 			(
 				uint256 amountInGcd,
 				uint256 amountOutGcd,
 				uint256 amountIn
 			) = getSwapData(swap, previousFill, newFill);
 
+			// todo: remove the need for this state access or optimize it
+			require(!userState.deactivated[account]);
+
 			TokenOp[] calldata inputs = swap.inputs;
 			for (uint256 j = 0; j < inputs.length; j++) { // todo: use flash accounting
 				(uint256 tokenId, uint256 amount) = (inputs[j].tokenId, inputs[j].amount);
 				amount = amount / amountInGcd * amountIn;
-				userData[swap.holder][msg.sender][swap.delay].balances[tokenId] -= amount;
-				userData[msg.sender][msg.sender][0].balances[tokenId] += amount;
+
+				userState.balances[tokenId] -= amount;
+				operatorState.balances[tokenId] += amount;
+				if (account != address(0))
+					userState.allowed[account][tokenId] -= amount;
 			}
 
 			TokenOp[] calldata outputs = swap.outputs;
 			for (uint256 j = 0; j < outputs.length; j++) { // todo: use flash accounting
 				(uint256 tokenId, uint256 amount) = (outputs[j].tokenId, outputs[j].amount);
 				amount = amount / amountOutGcd * swapEx.output;
-				userData[swap.holder][msg.sender][swap.delay].balances[tokenId] += amount;
-				userData[msg.sender][msg.sender][0].balances[tokenId] -= amount; // todo: extremely important to use flash accounting here
+
+				userState.balances[tokenId] += amount;
+				operatorState.balances[tokenId] -= amount; // todo: extremely important to use flash accounting here
+				if (account != address(0))
+					userState.allowed[account][tokenId] += amount;
 			}
 		}
 	}
