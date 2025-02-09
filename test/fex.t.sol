@@ -19,17 +19,6 @@ contract fExchangeSimplifiedTest is Test {
 		exchange = new fExchange(blueprintManager);
 		user = makeAddr("user");
 		operator = makeAddr("operator");
-		vm.deal(user, 100 ether);
-		vm.deal(operator, 100 ether);
-
-		// Set up the blueprint manager for the user.
-		vm.startPrank(user);
-		blueprintManager.setOperator(address(blueprintManager), true);
-		// Mint a moderate amount for tokenId 1.
-		blueprintManager.mint(user, 1, 10000);
-		// Approve the exchange as an operator.
-		blueprintManager.setOperator(address(exchange), true);
-		vm.stopPrank();
 	}
 
 	/// @dev Helper to execute a deposit action.
