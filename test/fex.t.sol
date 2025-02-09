@@ -6,32 +6,17 @@ import "../src/fex.sol"; // Make sure the path is correct.
 import {TokenOp} from "../lib/core/src/blueprints/BasicBlueprint.sol";
 import {BlueprintManager} from "../lib/core/src/BlueprintManager.sol";
 
-/// @dev A thin wrapper over fExchange that exposes a getter for the deposit balance.
-contract TestableFExchange is fExchange {
-    constructor(IBlueprintManager _blueprintManager) fExchange(_blueprintManager) {}
-
-    /// @notice Returns the deposit balance for a given token.
-    function getBalance(
-        address holder,
-        uint256 tokenId,
-        address operator,
-        uint256 delay
-    ) external view returns (uint256) {
-        return userData[holder][operator][delay].balances[tokenId];
-    }
-}
-
 contract fExchangeSimplifiedTest is Test {
-    TestableFExchange public exchange;
+    fExchange public exchange;
     BlueprintManager public blueprintManager;
     address public user;
     address public operator;
     uint256 public constant delay = 1 days;
 
     function setUp() public {
-        // Deploy BlueprintManager and TestableFExchange.
+        // Deploy BlueprintManager and fExchange.
         blueprintManager = new BlueprintManager();
-        exchange = new TestableFExchange(blueprintManager);
+        exchange = new fExchange(blueprintManager);
         user = makeAddr("user");
         operator = makeAddr("operator");
         vm.deal(user, 100 ether);
@@ -67,7 +52,7 @@ contract fExchangeSimplifiedTest is Test {
         deposits2[0] = TokenOp(1, 25);
         executeDeposit(deposits2);
 
-        uint256 bal = exchange.getBalance(user, 1, operator, delay);
+        uint256 bal = exchange.getBalance(user, operator, delay, 1);
         assertEq(bal, 75, "Accumulated deposit should be 75");
     }
 
@@ -91,8 +76,8 @@ contract fExchangeSimplifiedTest is Test {
             exchange.executeAction(actionB);
         }
 
-        uint256 balA = exchange.getBalance(user, 1, operatorA, delay);
-        uint256 balB = exchange.getBalance(user, 1, operatorB, delay);
+        uint256 balA = exchange.getBalance(user, operatorA, delay, 1);
+        uint256 balB = exchange.getBalance(user, operatorB, delay, 1);
         assertEq(balA, 100, "OperatorA balance should be 100");
         assertEq(balB, 100, "OperatorB balance should be 100");
     }
@@ -104,7 +89,7 @@ contract fExchangeSimplifiedTest is Test {
         vm.prank(address(blueprintManager));
         // This call will not revert in the current implementation.
         exchange.executeAction(action);
-        uint256 bal = exchange.getBalance(user, 1, operator, delay);
+        uint256 bal = exchange.getBalance(user, operator, delay, 1);
         assertEq(bal, 0, "Empty deposit should leave balance unchanged");
     }
 
@@ -115,7 +100,7 @@ contract fExchangeSimplifiedTest is Test {
         bytes memory action = abi.encode(user, operator, delay, deposits);
         vm.prank(address(blueprintManager));
         exchange.executeAction(action);
-        uint256 bal = exchange.getBalance(user, 1, operator, delay);
+        uint256 bal = exchange.getBalance(user, operator, delay, 1);
         assertEq(bal, 0, "Deposit of zero amount should leave balance unchanged");
     }
 
@@ -125,7 +110,7 @@ contract fExchangeSimplifiedTest is Test {
         TokenOp[] memory deposits = new TokenOp[](1);
         deposits[0] = TokenOp(1, depositAmount);
         executeDeposit(deposits);
-        uint256 bal = exchange.getBalance(user, 1, operator, delay);
+        uint256 bal = exchange.getBalance(user, operator, delay, 1);
         assertEq(bal, depositAmount, "Max deposit not recorded correctly");
     }
 

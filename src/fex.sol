@@ -99,6 +99,34 @@ contract fExchange is BasicBlueprint {
 		return (zero(), zero(), zero(), deposits);
 	}
 
+	function getBalance(
+		address holder,
+		address operator,
+		uint256 delay,
+		uint256 tokenId
+	) external view returns (uint256 balance) {
+		balance = userData[holder][operator][delay].balances[tokenId];
+	}
+
+	function getAllowed(
+		address holder,
+		address operator,
+		uint256 delay,
+		address subaccount,
+		uint256 tokenId
+	) external view returns (uint256 allowance) {
+		allowance = userData[holder][operator][delay].allowed[subaccount][tokenId];
+	}
+
+	function getDeactivationStatus(
+		address holder,
+		address operator,
+		uint256 delay,
+		address subaccount
+	) external view returns (bool deactivated) {
+		deactivated = userData[holder][operator][delay].deactivated[subaccount];
+	}
+
 	function ragequit(address operator, uint256 delay) external {
 		// todo: custom error
 		require(userData[msg.sender][operator][delay].ragequitTime == 0);
@@ -183,7 +211,7 @@ contract fExchange is BasicBlueprint {
 		}
 	}
 
-	function setActivationStatus(
+	function setDeactivationStatus(
 		address operator,
 		uint256 delay,
 		address[] calldata subaccounts,
