@@ -74,8 +74,8 @@ contract fExchange is BasicBlueprint {
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
-	mapping (address signer => mapping (bytes32 orderId => uint256 filled)) public fill;
-	mapping (address signer => mapping (bytes32 orderId => uint256 timestamp)) public cancelled;
+	mapping (address signer => mapping (bytes32 hash => uint256 filled)) public fill;
+	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
 
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager) {}
@@ -246,11 +246,14 @@ contract fExchange is BasicBlueprint {
 	}
 
 	function approveSubaccount(Permit calldata permit, bytes calldata signature) external { // todo: in a batch? only operator?
+		bytes32 permitId = keccak256(abi.encode(permit));
+		require(fill[permit.holder][permitId] == 0);
+		fill[permit.holder][permitId] = 1;
 		if (msg.sender != permit.holder) {
 			require(msg.sender == permit.operator);
 			require(SignatureCheckerLib.isValidSignatureNowCalldata(
 				permit.holder,
-				keccak256(abi.encode(permit)),
+				permitId,
 				signature
 			));
 		}
