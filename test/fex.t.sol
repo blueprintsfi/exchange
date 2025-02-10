@@ -112,30 +112,14 @@ contract fExchangeSimplifiedTest is Test {
 
 		// Ragequit by the user.
 		vm.prank(user);
-		exchange.ragequit(operator, delay);
+		exchange.ragequit(user, operator, delay);
 		(, uint256 rqTime) = exchange.userData(user, operator, delay);
 		assertTrue(rqTime != 0, "Ragequit time should be set");
 
 		// Unragequit by the user.
 		vm.prank(user);
-		exchange.unragequit(operator, delay);
+		exchange.unragequit(user, operator, delay);
 		(, uint256 rqTimeAfter) = exchange.userData(user, operator, delay);
 		assertEq(rqTimeAfter, 0, "Ragequit time should be cleared");
-	}
-
-	/// @notice Test that a call to ragequit from an address other than the deposit holder
-	/// sets the ragequit time for that caller (since no access control is implemented).
-	function test_RagequitUnauthorized() public {
-		// Deposit tokens as user.
-		TokenOp[] memory deposits = new TokenOp[](1);
-		deposits[0] = TokenOp(1, 100);
-		executeDeposit(deposits);
-
-		// Now simulate an "unauthorized" ragequit by the operator.
-		// In the current implementation, this call does NOT revert.
-		vm.prank(operator);
-		exchange.ragequit(operator, delay);
-		(, uint256 rqTime) = exchange.userData(operator, operator, delay);
-		assertTrue(rqTime != 0, "Operator ragequit should be recorded (per current implementation)");
 	}
 }

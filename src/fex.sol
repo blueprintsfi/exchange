@@ -11,19 +11,10 @@ struct Swap {
 	address holder;
 	address operator;
 	uint256 delay;
-	address subaccount;
 	uint256 deadlineAndNonce;
+	address to;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
-}
-
-struct Permit {
-	address holder;
-	address operator;
-	uint256 delay;
-	address subaccount;
-	uint256 deadlineAndNonce;
-	TokenOp[] tokens;
 }
 
 struct SwapExecution {
@@ -33,8 +24,6 @@ struct SwapExecution {
 
 struct UserData {
 	mapping (uint256 tokenId => uint256 balance) balances;
-	mapping (address subaccount => mapping (uint256 tokenId => uint256 allowance)) allowed;
-	mapping (address subaccount => bool deactivated) deactivated;
 	uint256 nonce;
 	uint256 ragequitTime;
 }
@@ -58,13 +47,13 @@ contract fExchange is BasicBlueprint {
 	/// @param operator The operator address
 	/// @param delay The delay period
 	/// @param timestamp When the ragequit was initiated
-	event Ragequit(address indexed holder, address indexed operator, uint256 indexed delay, uint256 timestamp);
+	event Ragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender, uint256 timestamp);
 
 	/// @notice Emitted when a user cancels their ragequit
 	/// @param holder The address canceling ragequit
 	/// @param operator The operator address
 	/// @param delay The delay period
-	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay);
+	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender);
 
 	/// @notice Emitted when an order is signed
 	/// @param holder The address signing the order
@@ -76,6 +65,7 @@ contract fExchange is BasicBlueprint {
 			mapping (uint256 delay => UserData data))) public userData;
 	mapping (address signer => mapping (bytes32 hash => uint256 filled)) public fill;
 	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
+	mapping (address subaccount => address account) public getMaster;
 
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager) {}
@@ -108,41 +98,28 @@ contract fExchange is BasicBlueprint {
 		balance = userData[holder][operator][delay].balances[tokenId];
 	}
 
-	function getAllowed(
-		address holder,
-		address operator,
-		uint256 delay,
-		address subaccount,
-		uint256 tokenId
-	) external view returns (uint256 allowance) {
-		allowance = userData[holder][operator][delay].allowed[subaccount][tokenId];
-	}
-
-	function getDeactivationStatus(
-		address holder,
-		address operator,
-		uint256 delay,
-		address subaccount
-	) external view returns (bool deactivated) {
-		deactivated = userData[holder][operator][delay].deactivated[subaccount];
-	}
-
-	function ragequit(address operator, uint256 delay) external {
+	function ragequit(address holder, address operator, uint256 delay) external {
 		// todo: custom error
-		require(userData[msg.sender][operator][delay].ragequitTime == 0);
-		userData[msg.sender][operator][delay].ragequitTime = block.timestamp;
-		emit Ragequit(msg.sender, operator, delay, block.timestamp);
+		if (msg.sender != holder)
+			require(msg.sender == getMaster[holder]);
+		require(userData[holder][operator][delay].ragequitTime == 0);
+		userData[holder][operator][delay].ragequitTime = block.timestamp;
+		emit Ragequit(holder, operator, delay, msg.sender, block.timestamp);
 	}
 
-	function unragequit(address operator, uint256 delay) external {
-		require(userData[msg.sender][operator][delay].ragequitTime != 0);
-		userData[msg.sender][operator][delay].ragequitTime = 0;
-		emit Unragequit(msg.sender, operator, delay);
+	function unragequit(address holder, address operator, uint256 delay) external {
+		if (msg.sender != holder)
+			require(msg.sender == getMaster[holder]);
+		require(userData[holder][operator][delay].ragequitTime != 0);
+		userData[holder][operator][delay].ragequitTime = 0;
+		emit Unragequit(holder, operator, delay, msg.sender);
 	}
 
-	function rageWithdraw(address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
+	function rageWithdraw(address holder, address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
 		// todo: custom error
-		uint256 ts = userData[msg.sender][operator][delay].ragequitTime;
+		if (msg.sender != holder)
+			require(msg.sender == getMaster[holder]);
+		uint256 ts = userData[holder][operator][delay].ragequitTime;
 		require(ts + delay < block.timestamp);
 		require(ts != 0);
 
@@ -150,8 +127,9 @@ contract fExchange is BasicBlueprint {
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
+			userData[holder][operator][delay].balances[tokenId] -= amount;
 			// todo: create a batch transfer in Blueprint Manager using a TokenOp array
+			// we transfer to the sender, which could be the subaccount or the master
 			BlueprintManager(address(blueprintManager)).transfer(msg.sender, tokenId, amount); // todo: ughh use interface
 		}
 	}
@@ -166,7 +144,8 @@ contract fExchange is BasicBlueprint {
 		bytes calldata signature
 	) external {
 		// todo: custom errors
-		require(holder == msg.sender || holder == to);
+		if (holder != msg.sender && holder != to)
+			require(msg.sender == getMaster[holder]);
 		require(SignatureCheckerLib.isValidSignatureNowCalldata(
 			operator,
 			// todo: is there any upside for including the operator in the signed data?
@@ -211,31 +190,6 @@ contract fExchange is BasicBlueprint {
 		}
 	}
 
-	function setDeactivationStatus(
-		address operator,
-		uint256 delay,
-		address[] calldata subaccounts,
-		bool[] calldata status
-	) external {
-		require(subaccounts.length == status.length);
-
-		for (uint256 i = 0; i < subaccounts.length; i++)
-			userData[msg.sender][operator][delay].deactivated[subaccounts[i]] = status[i];
-
-		// todo: add event
-	}
-
-	function operatorDeactivate( // todo: batch with other actions?
-		address holder,
-		uint256 delay,
-		address[] calldata subaccounts
-	) external {
-		for (uint256 i = 0; i < subaccounts.length; i++)
-			userData[holder][msg.sender][delay].deactivated[subaccounts[i]] = true;
-
-		// todo: add event
-	}
-
 	function operatorCancel(Swap[] calldata swaps) external {
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i];
@@ -245,24 +199,14 @@ contract fExchange is BasicBlueprint {
 		}
 	}
 
-	function approveSubaccount(Permit calldata permit, bytes calldata signature) external { // todo: in a batch? only operator?
-		bytes32 permitId = keccak256(abi.encode(permit));
-		require(fill[permit.holder][permitId] == 0);
-		fill[permit.holder][permitId] = 1;
-		if (msg.sender != permit.holder) {
-			require(msg.sender == permit.operator);
-			require(SignatureCheckerLib.isValidSignatureNowCalldata(
-				permit.holder,
-				permitId,
-				signature
-			));
-		}
-		require(block.timestamp <= (permit.deadlineAndNonce >> 128));
-		UserData storage userState = userData[permit.holder][permit.operator][permit.delay];
-
-		TokenOp[] calldata tokens = permit.tokens;
-		for (uint256 i = 0; i < tokens.length; i++)
-			userState.allowed[permit.subaccount][tokens[i].tokenId] += tokens[i].amount;
+	function declareSubaccount(address holder, address subaccount, bytes calldata signature) external {
+		require(getMaster[subaccount] == address(0));
+		require(SignatureCheckerLib.isValidSignatureNowCalldata(
+			subaccount,
+			keccak256(abi.encodePacked("I am a subaccount of ", holder)), // todo: make the data signed more serious
+			signature
+		));
+		getMaster[subaccount] = holder;
 	}
 
 	function getSwapData(Swap calldata swap, uint256 previousFill, uint256 newFill) internal pure returns (
@@ -286,20 +230,19 @@ contract fExchange is BasicBlueprint {
 		for (uint256 i = 0; i < swaps.length; i++) {
 			SwapExecution calldata swapEx = swaps[i];
 			Swap calldata swap = swapEx.swap;
-			address account = swap.subaccount;
 			address holder = swap.holder;
-			address signer = account == address(0) ? holder : account;
 			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
+			UserData storage toState = userData[swap.to][msg.sender][swap.delay]; // todo: consider allowing changing the delay and/or the operator
 			bytes32 orderId = keccak256(abi.encode(swap));
 
 			require(block.timestamp <= (swap.deadlineAndNonce >> 128));
 			require(swap.operator == msg.sender); // todo: operator shouldn't be in calldata then
 
-			uint256 previousFill = fill[signer][orderId];
+			uint256 previousFill = fill[holder][orderId];
 
 			if (previousFill == 0) {
 				require(SignatureCheckerLib.isValidSignatureNowCalldata(
-					signer,
+					holder,
 					orderId,
 					signatures[i]
 				));
@@ -307,15 +250,12 @@ contract fExchange is BasicBlueprint {
 				previousFill--;
 			}
 			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
-			fill[signer][orderId] = newFill + 1;
+			fill[holder][orderId] = newFill + 1;
 			(
 				uint256 amountInGcd,
 				uint256 amountOutGcd,
 				uint256 amountIn
 			) = getSwapData(swap, previousFill, newFill);
-
-			// todo: remove the need for this state access or optimize it
-			require(!userState.deactivated[account]);
 
 			TokenOp[] calldata inputs = swap.inputs;
 			for (uint256 j = 0; j < inputs.length; j++) { // todo: use flash accounting
@@ -324,8 +264,6 @@ contract fExchange is BasicBlueprint {
 
 				userState.balances[tokenId] -= amount;
 				operatorState.balances[tokenId] += amount;
-				if (account != address(0))
-					userState.allowed[account][tokenId] -= amount;
 			}
 
 			TokenOp[] calldata outputs = swap.outputs;
@@ -333,10 +271,8 @@ contract fExchange is BasicBlueprint {
 				(uint256 tokenId, uint256 amount) = (outputs[j].tokenId, outputs[j].amount);
 				amount = amount / amountOutGcd * swapEx.output;
 
-				userState.balances[tokenId] += amount;
+				toState.balances[tokenId] += amount;
 				operatorState.balances[tokenId] -= amount; // todo: extremely important to use flash accounting here
-				if (account != address(0))
-					userState.allowed[account][tokenId] += amount;
 			}
 		}
 	}
