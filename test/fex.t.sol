@@ -117,15 +117,7 @@ contract fExchangeFuzzTest is Test {
 	function test_DepositEmptyArray() public {
 		TokenOp[] memory dep = new TokenOp[](0);
 		bytes memory act = abi.encode(user, operator, delay, dep);
-		BlueprintCall[] memory calls = new BlueprintCall[](1);
-		calls[0] = BlueprintCall({
-			blueprint: address(exchange),
-			action: act,
-			sender: address(0),
-			checksum: 0
-		});
-		vm.prank(user);
-		blueprintManager.cook(user, calls);
+		executeDepositViaManager(act);
 		uint256 bal = exchange.getBalance(user, operator, delay, 1);
 		assertEq(bal, 0, "Empty deposit should leave balance unchanged");
 	}
@@ -135,15 +127,7 @@ contract fExchangeFuzzTest is Test {
 		TokenOp[] memory dep = new TokenOp[](1);
 		dep[0] = TokenOp(1, 0);
 		bytes memory act = abi.encode(user, operator, delay, dep);
-		BlueprintCall[] memory calls = new BlueprintCall[](1);
-		calls[0] = BlueprintCall({
-			blueprint: address(exchange),
-			action: act,
-			sender: address(0),
-			checksum: 0
-		});
-		vm.prank(user);
-		blueprintManager.cook(user, calls);
+		executeDepositViaManager(act);
 		uint256 bal = exchange.getBalance(user, operator, delay, 1);
 		assertEq(bal, 0, "Deposit of zero amount should leave balance unchanged");
 	}
@@ -162,8 +146,8 @@ contract fExchangeFuzzTest is Test {
 	
 	/// @notice Fuzz test for multiple deposits accumulation.
 	function test_FuzzMultipleDepositsAccumulation(uint256 amount1, uint256 amount2) public {
-		vm.assume(amount1 > 0 && amount1 <= 500);
-		vm.assume(amount2 > 0 && amount2 <= 500);
+		amount1 = bound(amount1, 1, 500);
+		amount2 = bound(amount2, 1, 500);
 		uint256 id = prepareTokensForTest(1000, 0);
 		TokenOp[] memory dep1 = new TokenOp[](1);
 		dep1[0] = TokenOp(id, amount1);
@@ -386,8 +370,8 @@ contract fExchangeFuzzTest is Test {
 	
 	/// @notice Test that deposits for different operators are stored separately.
 	function test_FuzzDepositDifferentOperators(uint256 amount1, uint256 amount2) public {
-		vm.assume(amount1 > 0 && amount1 <= 5000);
-		vm.assume(amount2 > 0 && amount2 <= 5000);
+		amount1 = bound(amount1, 1, 5000);
+		amount2 = bound(amount2, 1, 5000);
 		uint256 id = prepareTokensForTest(10000, 0);
 		
 		// Deposit for operatorA
@@ -396,15 +380,7 @@ contract fExchangeFuzzTest is Test {
 			TokenOp[] memory dep = new TokenOp[](1);
 			dep[0] = TokenOp(id, amount1);
 			bytes memory actA = abi.encode(user, operatorA, delay, dep);
-			BlueprintCall[] memory calls = new BlueprintCall[](1);
-			calls[0] = BlueprintCall({
-				blueprint: address(exchange),
-				action: actA,
-				sender: address(0),
-				checksum: 0
-			});
-			vm.prank(user);
-			blueprintManager.cook(user, calls);
+			executeDepositViaManager(actA);
 		}
 		
 		// Deposit for operatorB
@@ -413,15 +389,7 @@ contract fExchangeFuzzTest is Test {
 			TokenOp[] memory dep = new TokenOp[](1);
 			dep[0] = TokenOp(id, amount2);
 			bytes memory actB = abi.encode(user, operatorB, delay, dep);
-			BlueprintCall[] memory calls = new BlueprintCall[](1);
-			calls[0] = BlueprintCall({
-				blueprint: address(exchange),
-				action: actB,
-				sender: address(0),
-				checksum: 0
-			});
-			vm.prank(user);
-			blueprintManager.cook(user, calls);
+			executeDepositViaManager(actB);
 		}
 		
 		uint256 balA = exchange.getBalance(user, operatorA, delay, id);
