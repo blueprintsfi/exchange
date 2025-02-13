@@ -2,9 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
-import {IBlueprintManager} from "core/interfaces/IBlueprintManager.sol";
-import {BlueprintManager} from "core/BlueprintManager.sol"; // todo: change to interface and add transfers to the interface
-import {BasicBlueprint, TokenOp} from "core/blueprints/BasicBlueprint.sol";
+import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
+import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
 
 /// @notice Thrown when an unauthorized account tries to act on behalf of a holder
@@ -39,6 +38,12 @@ error WrongOperator();
 
 /// @notice Thrown when trying to fill beyond output GCD
 error ExceedsOutputGcd();
+
+/// @notice Thrown when signature verification fails
+error InvalidSignature();
+
+/// @notice Thrown when the nonce provided is invalid
+error InvalidNonce();
 
 struct Swap {
 	address holder;
@@ -163,10 +168,8 @@ contract fExchange is BasicBlueprint {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
 			userData[holder][operator][delay].balances[tokenId] -= amount;
-			// todo: create a batch transfer in Blueprint Manager using a TokenOp array
-			// we transfer to the sender, which could be the subaccount or the master
-			BlueprintManager(address(blueprintManager)).transfer(msg.sender, tokenId, amount); // todo: ughh use interface
 		}
+		blueprintManager.mint(msg.sender, withdrawals);
 	}
 
 	function withdraw(
@@ -178,16 +181,16 @@ contract fExchange is BasicBlueprint {
 		TokenOp[] calldata withdrawals,
 		bytes calldata signature
 	) external {
-		// todo: custom errors
 		if (holder != msg.sender && holder != to)
-			require(msg.sender == getMaster[holder]);
-		require(SignatureCheckerLib.isValidSignatureNowCalldata(
+			revert Unauthorized(msg.sender, holder);
+		if (!SignatureCheckerLib.isValidSignatureNowCalldata(
 			operator,
-			// todo: is there any upside for including the operator in the signed data?
 			keccak256(abi.encode(holder, delay, nonce, withdrawals)),
 			signature
-		));
-		require(userData[holder][operator][delay].nonce < nonce);
+		))
+			revert InvalidSignature();
+		if (userData[holder][operator][delay].nonce >= nonce)
+			revert InvalidNonce();
 		userData[holder][operator][delay].nonce = nonce;
 
 		uint256 len = withdrawals.length;
@@ -195,9 +198,8 @@ contract fExchange is BasicBlueprint {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
 			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
-			// todo: create a batch transfer in Blueprint Manager using a TokenOp array
-			BlueprintManager(address(blueprintManager)).transfer(msg.sender, tokenId, amount); // todo: ughh use interface
 		}
+		blueprintManager.mint(msg.sender, withdrawals);
 	}
 
 	function signOrder(bytes32 orderId) external {
