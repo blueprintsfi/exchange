@@ -93,10 +93,17 @@ contract fExchange is BasicBlueprint {
 	/// @param delay The delay period
 	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender);
 
-	/// @notice Emitted when an order is signed
-	/// @param holder The address signing the order
+	/// @notice Emitted when an order's fill state is modified
+	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
-	event OrderSigned(address indexed holder, bytes32 indexed orderId);
+	/// @param newFill The new fill amount
+	/// @param action The type of action that caused the update (e.g., "Signed", "Swapped", "Canceled")
+	event OrderFillUpdated(
+		address indexed holder,
+		bytes32 indexed orderId,
+		uint256 newFill,
+		string indexed action
+	);
 
 	mapping (address holder =>
 		mapping (address operator =>
@@ -207,7 +214,7 @@ contract fExchange is BasicBlueprint {
 			revert OrderAlreadySigned();
 		fill[msg.sender][orderId] = 1;
 
-		emit OrderSigned(msg.sender, orderId);
+		emit OrderFillUpdated(msg.sender, orderId, 1, "Signed");
 	}
 
 	function initCancel(bytes32[] calldata orderIds) external {
@@ -228,6 +235,7 @@ contract fExchange is BasicBlueprint {
 			if (ts == 0 || ts + swap.delay >= block.timestamp)
 				revert DelayNotPassed();
 			fill[msg.sender][orderId] = type(uint256).max;
+			emit OrderFillUpdated(msg.sender, orderId, type(uint256).max, "Canceled");
 		}
 	}
 
@@ -237,6 +245,7 @@ contract fExchange is BasicBlueprint {
 			require(swap.operator == msg.sender);
 			bytes32 orderId = keccak256(abi.encode(swap));
 			fill[swap.holder][orderId] = type(uint256).max;
+			emit OrderFillUpdated(swap.holder, orderId, type(uint256).max, "OperatorCanceled");
 		}
 	}
 
@@ -296,6 +305,7 @@ contract fExchange is BasicBlueprint {
 			}
 			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
 			fill[holder][orderId] = newFill + 1;
+			emit OrderFillUpdated(holder, orderId, newFill + 1, "Swapped");
 			(
 				uint256 amountInGcd,
 				uint256 amountOutGcd,
