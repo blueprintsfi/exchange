@@ -93,16 +93,46 @@ contract fExchange is BasicBlueprint {
 	/// @param delay The delay period
 	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender);
 
-	/// @notice Emitted when an order's fill state is modified
-	/// @param holder The address that owns the order
+	/// @notice Emitted when an order is signed
+	/// @param holder The address signing the order
 	/// @param orderId The unique identifier of the order
-	/// @param newFill The new fill amount
-	/// @param action The type of action that caused the update (e.g., "Signed", "Swapped", "Canceled")
-	event OrderFillUpdated(
+	/// @param fill The fill amount (always 1 for signing)
+	event OrderSigned(
 		address indexed holder,
 		bytes32 indexed orderId,
-		uint256 newFill,
-		string indexed action
+		uint256 fill
+	);
+
+	/// @notice Emitted when an order is canceled
+	/// @param holder The address that owns the order
+	/// @param orderId The unique identifier of the order
+	/// @param fill The fill amount (always type(uint256).max for cancellation)
+	event OrderCanceled(
+		address indexed holder,
+		bytes32 indexed orderId,
+		uint256 fill
+	);
+
+	/// @notice Emitted when an order is canceled by the operator
+	/// @param holder The address that owns the order
+	/// @param orderId The unique identifier of the order
+	/// @param operator The operator that canceled the order
+	/// @param fill The fill amount (always type(uint256).max for cancellation)
+	event OrderOperatorCanceled(
+		address indexed holder,
+		bytes32 indexed orderId,
+		address indexed operator,
+		uint256 fill
+	);
+
+	/// @notice Emitted when an order is filled via swap
+	/// @param holder The address that owns the order
+	/// @param orderId The unique identifier of the order
+	/// @param fill The new fill amount
+	event OrderSwapped(
+		address indexed holder,
+		bytes32 indexed orderId,
+		uint256 fill
 	);
 
 	mapping (address holder =>
@@ -223,7 +253,7 @@ contract fExchange is BasicBlueprint {
 			revert OrderAlreadySigned();
 		fill[msg.sender][orderId] = 1;
 
-		emit OrderFillUpdated(msg.sender, orderId, 1, "Signed");
+		emit OrderSigned(msg.sender, orderId, 1);
 	}
 
 	function initCancel(bytes32[] calldata orderIds) external {
@@ -244,7 +274,7 @@ contract fExchange is BasicBlueprint {
 			if (ts == 0 || ts + swap.delay >= block.timestamp)
 				revert DelayNotPassed();
 			fill[msg.sender][orderId] = type(uint256).max;
-			emit OrderFillUpdated(msg.sender, orderId, type(uint256).max, "Canceled");
+			emit OrderCanceled(msg.sender, orderId, type(uint256).max);
 		}
 	}
 
@@ -254,7 +284,7 @@ contract fExchange is BasicBlueprint {
 			require(swap.operator == msg.sender);
 			bytes32 orderId = keccak256(abi.encode(swap));
 			fill[swap.holder][orderId] = type(uint256).max;
-			emit OrderFillUpdated(swap.holder, orderId, type(uint256).max, "OperatorCanceled");
+			emit OrderOperatorCanceled(swap.holder, orderId, msg.sender, type(uint256).max);
 		}
 	}
 
@@ -314,7 +344,7 @@ contract fExchange is BasicBlueprint {
 			}
 			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
 			fill[holder][orderId] = newFill + 1;
-			emit OrderFillUpdated(holder, orderId, newFill + 1, "Swapped");
+			emit OrderSwapped(holder, orderId, newFill + 1);
 			(
 				uint256 amountInGcd,
 				uint256 amountOutGcd,
