@@ -188,16 +188,25 @@ contract fExchange is BasicBlueprint {
 		TokenOp[] calldata withdrawals,
 		bytes calldata signature
 	) external {
-		if (holder != msg.sender && holder != to)
-			revert Unauthorized(msg.sender, holder);
-		if (!SignatureCheckerLib.isValidSignatureNowCalldata(
-			operator,
-			keccak256(abi.encode(holder, delay, nonce, withdrawals)),
-			signature
-		))
+		if (holder != msg.sender && holder != to) {
+			if (msg.sender != getMaster[holder])
+				revert Unauthorized(msg.sender, holder);
+		}
+
+		if (
+			!SignatureCheckerLib.isValidSignatureNowCalldata(
+				operator,
+				// todo: is there any upside for including the operator in the signed data?
+				keccak256(abi.encode(holder, delay, nonce, withdrawals)),
+				signature
+			)
+		) {
 			revert InvalidSignature();
-		if (userData[holder][operator][delay].nonce >= nonce)
+		}
+
+		if (userData[holder][operator][delay].nonce >= nonce) {
 			revert InvalidNonce();
+		}
 		userData[holder][operator][delay].nonce = nonce;
 
 		uint256 len = withdrawals.length;
