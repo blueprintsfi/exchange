@@ -7,6 +7,39 @@ import {BlueprintManager} from "core/BlueprintManager.sol"; // todo: change to i
 import {BasicBlueprint, TokenOp} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
 
+/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
+error Unauthorized(address sender, address holder);
+
+/// @notice Thrown when a ragequit is already set
+error RagequitAlreadySet();
+
+/// @notice Thrown when no ragequit is set
+error NoRagequitSet();
+
+/// @notice Thrown when trying to withdraw before delay has passed
+error DelayNotPassed();
+
+/// @notice Thrown when trying to fill beyond the maximum amount
+error ExceedsMaxFill();
+
+/// @notice Thrown when trying to sign an already signed order
+error OrderAlreadySigned();
+
+/// @notice Thrown when trying to cancel an order that hasn't been marked for cancellation
+error NotMarkedForCancellation();
+
+/// @notice Thrown when trying to declare a subaccount that already has a master
+error SubaccountAlreadyDeclared();
+
+/// @notice Thrown when an order has expired
+error OrderExpired();
+
+/// @notice Thrown when trying to execute a swap with wrong operator
+error WrongOperator();
+
+/// @notice Thrown when trying to fill beyond output GCD
+error ExceedsOutputGcd();
+
 struct Swap {
 	address holder;
 	address operator;
@@ -99,29 +132,31 @@ contract fExchange is BasicBlueprint {
 	}
 
 	function ragequit(address holder, address operator, uint256 delay) external {
-		// todo: custom error
-		if (msg.sender != holder)
-			require(msg.sender == getMaster[holder]);
-		require(userData[holder][operator][delay].ragequitTime == 0);
+		if (msg.sender != holder && msg.sender != getMaster[holder])
+			revert Unauthorized(msg.sender, holder);
+		if (userData[holder][operator][delay].ragequitTime != 0)
+			revert RagequitAlreadySet();
 		userData[holder][operator][delay].ragequitTime = block.timestamp;
 		emit Ragequit(holder, operator, delay, msg.sender, block.timestamp);
 	}
 
 	function unragequit(address holder, address operator, uint256 delay) external {
-		if (msg.sender != holder)
-			require(msg.sender == getMaster[holder]);
-		require(userData[holder][operator][delay].ragequitTime != 0);
+		if (msg.sender != holder && msg.sender != getMaster[holder])
+			revert Unauthorized(msg.sender, holder);
+		if (userData[holder][operator][delay].ragequitTime == 0)
+			revert NoRagequitSet();
 		userData[holder][operator][delay].ragequitTime = 0;
 		emit Unragequit(holder, operator, delay, msg.sender);
 	}
 
 	function rageWithdraw(address holder, address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
-		// todo: custom error
-		if (msg.sender != holder)
-			require(msg.sender == getMaster[holder]);
+		if (msg.sender != holder && msg.sender != getMaster[holder])
+			revert Unauthorized(msg.sender, holder);
 		uint256 ts = userData[holder][operator][delay].ragequitTime;
-		require(ts + delay < block.timestamp);
-		require(ts != 0);
+		if (ts == 0)
+			revert NoRagequitSet();
+		if (ts + delay >= block.timestamp)
+			revert DelayNotPassed();
 
 		uint256 len = withdrawals.length;
 		for (uint256 i = 0; i < len; i++) {
@@ -166,7 +201,8 @@ contract fExchange is BasicBlueprint {
 	}
 
 	function signOrder(bytes32 orderId) external {
-		require(fill[msg.sender][orderId] == 0);
+		if (fill[msg.sender][orderId] != 0)
+			revert OrderAlreadySigned();
 		fill[msg.sender][orderId] = 1;
 
 		emit OrderSigned(msg.sender, orderId);
@@ -174,7 +210,8 @@ contract fExchange is BasicBlueprint {
 
 	function initCancel(bytes32[] calldata orderIds) external {
 		for (uint256 i = 0; i < orderIds.length; i++) {
-			require(cancelled[msg.sender][orderIds[i]] == 0);
+			if (cancelled[msg.sender][orderIds[i]] != 0)
+				revert OrderAlreadySigned();
 			cancelled[msg.sender][orderIds[i]] = block.timestamp;
 		}
 	}
@@ -182,10 +219,12 @@ contract fExchange is BasicBlueprint {
 	function cancel(Swap[] calldata swaps) external {
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i];
-			require(swap.holder == msg.sender);
+			if (swap.holder != msg.sender)
+				revert Unauthorized(msg.sender, swap.holder);
 			bytes32 orderId = keccak256(abi.encode(swap));
 			uint256 ts = cancelled[msg.sender][orderId];
-			require(ts != 0 && ts + swap.delay < block.timestamp);
+			if (ts == 0 || ts + swap.delay >= block.timestamp)
+				revert DelayNotPassed();
 			fill[msg.sender][orderId] = type(uint256).max;
 		}
 	}
@@ -200,7 +239,8 @@ contract fExchange is BasicBlueprint {
 	}
 
 	function declareSubaccount(address holder, address subaccount, bytes calldata signature) external {
-		require(getMaster[subaccount] == address(0));
+		if (getMaster[subaccount] != address(0))
+			revert SubaccountAlreadyDeclared();
 		require(SignatureCheckerLib.isValidSignatureNowCalldata(
 			subaccount,
 			keccak256(abi.encodePacked("I am a subaccount of ", holder)), // todo: make the data signed more serious
@@ -217,7 +257,8 @@ contract fExchange is BasicBlueprint {
 		amountInGcd = gcd(swap.inputs);
 		amountOutGcd = gcd(swap.outputs);
 
-		require(newFill < amountOutGcd); // todo: custom error
+		if (newFill >= amountOutGcd)
+			revert ExceedsOutputGcd();
 
 		uint256 previousInput = amountInGcd * previousFill / amountOutGcd;
 		uint256 newInput = amountInGcd * newFill / amountOutGcd;
@@ -235,8 +276,10 @@ contract fExchange is BasicBlueprint {
 			UserData storage toState = userData[swap.to][msg.sender][swap.delay]; // todo: consider allowing changing the delay and/or the operator
 			bytes32 orderId = keccak256(abi.encode(swap));
 
-			require(block.timestamp <= (swap.deadlineAndNonce >> 128));
-			require(swap.operator == msg.sender); // todo: operator shouldn't be in calldata then
+			if (block.timestamp > (swap.deadlineAndNonce >> 128))
+				revert OrderExpired();
+			if (swap.operator != msg.sender)  // todo: operator shouldn't be in calldata then
+				revert WrongOperator();
 
 			uint256 previousFill = fill[holder][orderId];
 
