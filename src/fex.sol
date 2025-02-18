@@ -3,6 +3,8 @@ pragma solidity ^0.8.13;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
+import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
+import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
 
@@ -346,28 +348,68 @@ contract fExchange is BasicBlueprint {
 			fill[holder][orderId] = newFill + 1;
 			emit OrderSwapped(holder, orderId, newFill + 1);
 			(
-				uint256 amountInGcd,
-				uint256 amountOutGcd,
+				uint256 inGcd,
+				uint256 outGcd,
 				uint256 amountIn
 			) = getSwapData(swap, previousFill, newFill);
 
-			TokenOp[] calldata inputs = swap.inputs;
-			for (uint256 j = 0; j < inputs.length; j++) { // todo: use flash accounting
-				(uint256 tokenId, uint256 amount) = (inputs[j].tokenId, inputs[j].amount);
-				amount = amount / amountInGcd * amountIn;
+			addFlashOps(swap.inputs, getSlot(operatorState), getSlot(userState), inGcd, amountIn);
+			addFlashOps(swap.outputs, getSlot(toState), getSlot(operatorState), outGcd, amountIn);
+		}
 
-				userState.balances[tokenId] -= amount;
-				operatorState.balances[tokenId] += amount;
-			}
+		for (uint256 i = 0; i < swaps.length; i++) {
+			Swap calldata swap = swaps[i].swap;
+			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
+			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
 
-			TokenOp[] calldata outputs = swap.outputs;
-			for (uint256 j = 0; j < outputs.length; j++) { // todo: use flash accounting
-				(uint256 tokenId, uint256 amount) = (outputs[j].tokenId, outputs[j].amount);
-				amount = amount / amountOutGcd * swapEx.output;
+			settleFlashOps(swap.inputs, userState, operatorState);
+			settleFlashOps(swap.outputs, toState, operatorState);
+		}
+	}
 
-				toState.balances[tokenId] += amount;
-				operatorState.balances[tokenId] -= amount; // todo: extremely important to use flash accounting here
-			}
+	function addFlashOps(
+		TokenOp[] calldata array,
+		uint256 add,
+		uint256 sub,
+		uint256 gcd,
+		uint256 amountIn
+	) internal {
+		for (uint256 i = 0; i < array.length; i++) {
+			(uint256 tokenId, uint256 amount) = (array[i].tokenId, array[i].amount);
+			amount = amount / gcd * amountIn;
+
+			Flash.addFlashValue(HashLib.hash(tokenId, add), amount);
+			Flash.subtractFlashValue(HashLib.hash(tokenId, sub), amount);
+		}
+	}
+
+	// note: this function just returns the argument, check if this causes additional gas usage
+	function getSlot(UserData storage state) internal view returns (uint256 slot) {
+		mapping (uint256 => uint256) storage balances = state.balances;
+		assembly ("memory-safe") {
+			slot := balances.slot
+		}
+	}
+
+	function settleFlashOp(uint256 id, UserData storage state) internal {
+		(uint256 positive, uint256 negative) =
+			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(state)));
+
+		if (positive != 0)
+			state.balances[id] += positive;
+		else if (negative != 0)
+			state.balances[id] -= negative;
+	}
+
+	function settleFlashOps(
+		TokenOp[] calldata array,
+		UserData storage state0,
+		UserData storage state1
+	) internal {
+		for (uint256 i = 0; i < array.length; i++) {
+			uint256 id = array[i].tokenId;
+			settleFlashOp(id, state0);
+			settleFlashOp(id, state1);
 		}
 	}
 }
