@@ -9,7 +9,7 @@ import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
 
 /// @notice Thrown when an unauthorized account tries to act on behalf of a holder
-error Unauthorized(address sender, address holder);
+error Unauthorized();
 
 /// @notice Thrown when a ragequit is already set
 error RagequitAlreadySet();
@@ -181,7 +181,7 @@ contract fExchange is BasicBlueprint {
 
 	function ragequit(address holder, address operator, uint256 delay) external {
 		if (msg.sender != holder && msg.sender != getMaster[holder])
-			revert Unauthorized(msg.sender, holder);
+			revert Unauthorized();
 		if (userData[holder][operator][delay].ragequitTime != 0)
 			revert RagequitAlreadySet();
 		userData[holder][operator][delay].ragequitTime = block.timestamp;
@@ -190,7 +190,7 @@ contract fExchange is BasicBlueprint {
 
 	function unragequit(address holder, address operator, uint256 delay) external {
 		if (msg.sender != holder && msg.sender != getMaster[holder])
-			revert Unauthorized(msg.sender, holder);
+			revert Unauthorized();
 		if (userData[holder][operator][delay].ragequitTime == 0)
 			revert NoRagequitSet();
 		userData[holder][operator][delay].ragequitTime = 0;
@@ -199,7 +199,7 @@ contract fExchange is BasicBlueprint {
 
 	function rageWithdraw(address holder, address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
 		if (msg.sender != holder && msg.sender != getMaster[holder])
-			revert Unauthorized(msg.sender, holder);
+			revert Unauthorized();
 		uint256 ts = userData[holder][operator][delay].ragequitTime;
 		if (ts == 0)
 			revert NoRagequitSet();
@@ -226,7 +226,7 @@ contract fExchange is BasicBlueprint {
 	) external {
 		if (holder != msg.sender && holder != to) {
 			if (msg.sender != getMaster[holder])
-				revert Unauthorized(msg.sender, holder);
+				revert Unauthorized();
 		}
 
 		if (
@@ -273,8 +273,6 @@ contract fExchange is BasicBlueprint {
 	function cancel(Swap[] calldata swaps) external {
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i];
-			if (swap.holder != msg.sender)
-				revert Unauthorized(msg.sender, swap.holder);
 			bytes32 orderId = keccak256(abi.encode(swap));
 			uint256 ts = cancelled[msg.sender][orderId];
 			if (ts == 0 || ts + swap.delay >= block.timestamp)
