@@ -80,40 +80,48 @@ contract fExchange is BasicBlueprint {
 	/// @param operator The operator address
 	/// @param delay The delay period for the deposit
 	/// @param deposits Array of token operations containing deposit details
-	event Deposit(address indexed depositFor, address indexed operator, uint256 indexed delay, TokenOp[] deposits);
+	event Deposit(
+		address indexed depositFor,
+		address indexed operator,
+		uint256 indexed delay,
+		TokenOp[] deposits
+	);
 
 	/// @notice Emitted when a user initiates ragequit
 	/// @param holder The address initiating ragequit
 	/// @param operator The operator address
 	/// @param delay The delay period
 	/// @param timestamp When the ragequit was initiated
-	event Ragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender, uint256 timestamp);
+	event Ragequit(
+		address indexed holder,
+		address indexed operator,
+		uint256 indexed delay,
+		address sender,
+		uint256 timestamp
+	);
 
 	/// @notice Emitted when a user cancels their ragequit
 	/// @param holder The address canceling ragequit
 	/// @param operator The operator address
 	/// @param delay The delay period
-	event Unragequit(address indexed holder, address indexed operator, uint256 indexed delay, address sender);
+	event Unragequit(
+		address indexed holder,
+		address indexed operator,
+		uint256 indexed delay,
+		address sender
+	);
 
 	/// @notice Emitted when an order is signed
 	/// @param holder The address signing the order
 	/// @param orderId The unique identifier of the order
 	/// @param fill The fill amount (always 1 for signing)
-	event OrderSigned(
-		address indexed holder,
-		bytes32 indexed orderId,
-		uint256 fill
-	);
+	event OrderSigned(address indexed holder, bytes32 indexed orderId, uint256 fill);
 
 	/// @notice Emitted when an order is canceled
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
 	/// @param fill The fill amount (always type(uint256).max for cancellation)
-	event OrderCanceled(
-		address indexed holder,
-		bytes32 indexed orderId,
-		uint256 fill
-	);
+	event OrderCanceled(address indexed holder, bytes32 indexed orderId, uint256 fill);
 
 	/// @notice Emitted when an order is canceled by the operator
 	/// @param holder The address that owns the order
@@ -131,11 +139,7 @@ contract fExchange is BasicBlueprint {
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
 	/// @param fill The new fill amount
-	event OrderSwapped(
-		address indexed holder,
-		bytes32 indexed orderId,
-		uint256 fill
-	);
+	event OrderSwapped(address indexed holder,bytes32 indexed orderId,uint256 fill);
 
 	mapping (address holder =>
 		mapping (address operator =>
