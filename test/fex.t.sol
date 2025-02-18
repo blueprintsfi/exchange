@@ -26,7 +26,7 @@ contract fExchangeFuzzTest is Test {
 	function prepareTokensForTest(uint256 amount, uint256 seed) internal returns (uint256 tokenId) {
 		// Mint tokens to the test contract
 		blueprintManager.mint(address(this), seed, amount);
-		tokenId = HashLib.getTokenId(address(this), seed);
+		tokenId = HashLib.hash(address(this), seed);
 		// Transfer tokens to user
 		blueprintManager.transfer(user, tokenId, amount);
 	}
@@ -304,7 +304,6 @@ contract fExchangeFuzzTest is Test {
 
 	/// @notice Test subaccount declaration.
 	function test_DeclareSubaccount() public {
-		address sub = makeAddr("subaccount");
 		uint256 subPk = uint256(keccak256(abi.encodePacked("subaccount")));
 		address subAddr = vm.addr(subPk);
 
