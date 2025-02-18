@@ -206,7 +206,7 @@ contract fExchange is BasicBlueprint {
 			uint256 amount = withdrawals[i].amount;
 			userData[holder][operator][delay].balances[tokenId] -= amount;
 		}
-		blueprintManager.mint(msg.sender, withdrawals);
+		blueprintManager.transfer(msg.sender, withdrawals);
 	}
 
 	function withdraw(
@@ -245,7 +245,7 @@ contract fExchange is BasicBlueprint {
 			uint256 amount = withdrawals[i].amount;
 			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
 		}
-		blueprintManager.mint(msg.sender, withdrawals);
+		blueprintManager.transfer(msg.sender, withdrawals);
 	}
 
 	function signOrder(bytes32 orderId) external {
