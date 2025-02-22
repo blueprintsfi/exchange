@@ -2,13 +2,14 @@
 pragma solidity ^0.8.13;
 
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
+import {EIP712} from "solady/utils/EIP712.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
 import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {gcd} from "core/libraries/Math.sol";
 
-/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
+	/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
 error Unauthorized();
 
 /// @notice Thrown when a ragequit is already set
@@ -74,7 +75,7 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract fExchange is BasicBlueprint {
+contract fExchange is BasicBlueprint, EIP712 {
 	/// @notice Emitted when tokens are deposited into the exchange
 	/// @param depositFor The address receiving the deposit
 	/// @param operator The operator address
@@ -148,8 +149,28 @@ contract fExchange is BasicBlueprint {
 	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
 	mapping (address subaccount => address account) public getMaster;
 
+	/// @dev Type hash for the Withdraw struct
+	bytes32 private constant WITHDRAW_TYPEHASH = keccak256(
+		"Withdraw(address holder,uint256 delay,uint256 nonce,bytes32 withdrawalsHash)"
+	);
+
+	/// @dev Type hash for the TokenOp struct
+	bytes32 private constant TOKENOP_TYPEHASH = keccak256(
+		"TokenOp(uint256 tokenId,uint256 amount)"
+	);
+
+	/// @dev Type hash for the Subaccount declaration
+	bytes32 private constant SUBACCOUNT_TYPEHASH = keccak256(
+		"SubaccountDeclaration(address holder,address subaccount)"
+	);
+
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager) {}
+
+	function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
+		name = "fExchange";
+		version = "1";
+	}
 
 	// deposit using cook
 	function executeAction(bytes calldata action) external onlyManager returns (
@@ -229,11 +250,18 @@ contract fExchange is BasicBlueprint {
 				revert Unauthorized();
 		}
 
+		bytes32 withdrawalHash = keccak256(abi.encode(
+			WITHDRAW_TYPEHASH,
+			holder,
+			delay,
+			nonce,
+			_hashTokenOps(withdrawals)
+		));
+
 		if (
 			!SignatureCheckerLib.isValidSignatureNowCalldata(
 				operator,
-				// todo: is there any upside for including the operator in the signed data?
-				keccak256(abi.encode(holder, delay, nonce, withdrawals)),
+				_hashTypedData(withdrawalHash),
 				signature
 			)
 		) {
@@ -295,9 +323,16 @@ contract fExchange is BasicBlueprint {
 	function declareSubaccount(address holder, address subaccount, bytes calldata signature) external {
 		if (getMaster[subaccount] != address(0))
 			revert SubaccountAlreadyDeclared();
+
+		bytes32 subaccountHash = keccak256(abi.encode(
+			SUBACCOUNT_TYPEHASH,
+			holder,
+			subaccount
+		));
+
 		require(SignatureCheckerLib.isValidSignatureNowCalldata(
 			subaccount,
-			keccak256(abi.encodePacked("I am a subaccount of ", holder)), // todo: make the data signed more serious
+			_hashTypedData(subaccountHash),
 			signature
 		));
 		getMaster[subaccount] = holder;
@@ -413,5 +448,26 @@ contract fExchange is BasicBlueprint {
 			settleFlashOp(id, state0);
 			settleFlashOp(id, state1);
 		}
+	}
+
+	/// @dev Helper function to hash an array of TokenOps
+	function _hashTokenOps(TokenOp[] calldata ops) internal pure returns (bytes32) {
+		if (ops.length == 0) return bytes32(0);
+		if (ops.length == 1) {
+			return keccak256(abi.encode(
+				TOKENOP_TYPEHASH,
+				ops[0].tokenId,
+				ops[0].amount
+			));
+		}
+		bytes32[] memory hashes = new bytes32[](ops.length);
+		for (uint256 i = 0; i < ops.length; i++) {
+			hashes[i] = keccak256(abi.encode(
+				TOKENOP_TYPEHASH,
+				ops[i].tokenId,
+				ops[i].amount
+			));
+		}
+		return keccak256(abi.encodePacked(hashes));
 	}
 }
