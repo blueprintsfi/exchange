@@ -160,7 +160,7 @@ contract fExchange is BasicBlueprint, EIP712 {
 	);
 
 	/// @dev Type hash for the Subaccount declaration
-	bytes32 private constant SUBACCOUNT_TYPEHASH = keccak256(
+	bytes32 public constant SUBACCOUNT_TYPEHASH = keccak256(
 		"SubaccountDeclaration(address holder,address subaccount)"
 	);
 

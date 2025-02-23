@@ -307,9 +307,28 @@ contract fExchangeFuzzTest is Test {
 		uint256 subPk = uint256(keccak256(abi.encodePacked("subaccount")));
 		address subAddr = vm.addr(subPk);
 
-		// Create proper signature
-		bytes32 messageHash = keccak256(abi.encodePacked("I am a subaccount of ", user));
-		(uint8 v, bytes32 r, bytes32 s) = vm.sign(subPk, messageHash);
+		// Create the subaccount declaration hash
+		bytes32 subaccountHash = keccak256(abi.encode(
+			exchange.SUBACCOUNT_TYPEHASH(),
+			user,
+			subAddr
+		));
+
+		// Compute the domain separator exactly as EIP-712 requires.
+		bytes32 domainSeparator = keccak256(
+			abi.encode(
+				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+				keccak256(bytes("fExchange")),
+				keccak256(bytes("1")),
+				block.chainid,
+				address(exchange)
+			)
+		);
+		
+		// Manually compute the digest matching EIP-712
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, subaccountHash));
+		
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(subPk, digest);
 		bytes memory signature = abi.encodePacked(r, s, v);
 
 		vm.prank(user);
