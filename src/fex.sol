@@ -35,6 +35,11 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 		"SubaccountDeclaration(address holder,address subaccount)"
 	);
 
+	/// @dev Type hash for the Swap struct
+	bytes32 public constant SWAP_TYPEHASH = keccak256(
+		"Swap(address holder,address to,address operator,uint256 delay,uint256 deadlineAndNonce,TokenOp[] inputs,TokenOp[] outputs)TokenOp(uint256 tokenId,uint256 amount)"
+	);
+
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager) {}
 
@@ -234,27 +239,41 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 			address holder = swap.holder;
 			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
 			UserData storage toState = userData[swap.to][msg.sender][swap.delay]; // todo: consider allowing changing the delay and/or the operator
-			bytes32 orderId = keccak256(abi.encode(swap));
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
 			if (swap.operator != msg.sender)  // todo: operator shouldn't be in calldata then
 				revert WrongOperator();
 
-			uint256 previousFill = fill[holder][orderId];
+			bytes32 swapHash = keccak256(abi.encode(
+				SWAP_TYPEHASH,
+				swap.holder,
+				swap.to,
+				swap.operator,
+				swap.delay,
+				swap.deadlineAndNonce,
+				swap.inputs,
+				swap.outputs
+			));
+
+			// Note: The computed digest serves as the order identifier (orderId) for this swap.
+			bytes32 digest = _hashTypedData(swapHash);
+
+			uint256 previousFill = fill[holder][digest];
 
 			if (previousFill == 0) {
 				require(SignatureCheckerLib.isValidSignatureNowCalldata(
 					holder,
-					orderId,
+					digest,
 					signatures[i]
 				));
 			} else {
 				previousFill--;
 			}
 			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
-			fill[holder][orderId] = newFill + 1;
-			emit OrderSwapped(holder, orderId, newFill + 1);
+			fill[holder][digest] = newFill + 1;
+			emit OrderSwapped(holder, digest, newFill + 1);
+
 			(
 				uint256 inGcd,
 				uint256 outGcd,
