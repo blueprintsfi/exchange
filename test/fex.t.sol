@@ -151,12 +151,12 @@ contract fExchangeFuzzTest is Test {
 		uint256 id = prepareTokensForTest(1000, 0);
 		TokenOp[] memory dep1 = new TokenOp[](1);
 		dep1[0] = TokenOp(id, amount1);
-		bytes memory act1 = abi.encode(user, operator, delay, dep1);
+		bytes memory act1 = encodeDepositAction(dep1);
 		executeDepositViaManager(act1);
 
 		TokenOp[] memory dep2 = new TokenOp[](1);
 		dep2[0] = TokenOp(id, amount2);
-		bytes memory act2 = abi.encode(user, operator, delay, dep2);
+		bytes memory act2 = encodeDepositAction(dep2);
 		executeDepositViaManager(act2);
 
 		uint256 expected = amount1 + amount2;
@@ -482,5 +482,54 @@ contract fExchangeFuzzTest is Test {
 
 		uint256 fillStatus = exchange.fill(user, orderId);
 		assertEq(fillStatus, type(uint256).max, "Cancel should set fill to max");
+	}
+
+	/// @notice Test withdraw signature verification with TokenOp array
+	function test_WithdrawSignature() public {
+		uint256 id = prepareTokensForTest(1000, 0);
+		TokenOp[] memory withdrawals = new TokenOp[](1);
+		withdrawals[0] = TokenOp(id, 100);
+
+		// Create the withdraw hash
+		bytes32 withdrawHash = keccak256(abi.encode(
+			exchange.WITHDRAW_TYPEHASH(),
+			user,
+			delay,
+			1, // nonce
+			withdrawals
+		));
+
+		// Compute the domain separator exactly as EIP-712 requires
+		bytes32 domainSeparator = keccak256(
+			abi.encode(
+				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+				keccak256(bytes("fExchange")),
+				keccak256(bytes("1")),
+				block.chainid,
+				address(exchange)
+			)
+		);
+		
+		// Manually compute the digest matching EIP-712
+		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, withdrawHash));
+		
+		// Sign with operator's key
+		uint256 operatorPk = uint256(keccak256(abi.encodePacked("operator")));
+		operator = vm.addr(operatorPk);
+		(uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorPk, digest);
+		bytes memory signature = abi.encodePacked(r, s, v);
+
+		// First deposit some tokens
+		TokenOp[] memory dep = new TokenOp[](1);
+		dep[0] = TokenOp(id, 100);
+		bytes memory act = abi.encode(user, operator, delay, dep);
+		executeDepositViaManager(act);
+
+		// Execute withdraw
+		vm.prank(user);
+		exchange.withdraw(user, user, operator, delay, 1, withdrawals, signature);
+
+		uint256 bal = exchange.getBalance(user, operator, delay, id);
+		assertEq(bal, 0, "Balance should be 0 after withdraw");
 	}
 }

@@ -26,13 +26,8 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 	mapping (address subaccount => address account) public getMaster;
 
 	/// @dev Type hash for the Withdraw struct
-	bytes32 private constant WITHDRAW_TYPEHASH = keccak256(
-		"Withdraw(address holder,uint256 delay,uint256 nonce,bytes32 withdrawalsHash)"
-	);
-
-	/// @dev Type hash for the TokenOp struct
-	bytes32 private constant TOKENOP_TYPEHASH = keccak256(
-		"TokenOp(uint256 tokenId,uint256 amount)"
+	bytes32 public constant WITHDRAW_TYPEHASH = keccak256(
+		"Withdraw(address holder,uint256 delay,uint256 nonce,TokenOp[] withdrawals)TokenOp(uint256 tokenId,uint256 amount)"
 	);
 
 	/// @dev Type hash for the Subaccount declaration
@@ -131,7 +126,7 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 			holder,
 			delay,
 			nonce,
-			_hashTokenOps(withdrawals)
+			withdrawals
 		));
 
 		if (
@@ -324,26 +319,5 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 			settleFlashOp(id, state0);
 			settleFlashOp(id, state1);
 		}
-	}
-
-	/// @dev Helper function to hash an array of TokenOps
-	function _hashTokenOps(TokenOp[] calldata ops) internal pure returns (bytes32) {
-		if (ops.length == 0) return bytes32(0);
-		if (ops.length == 1) {
-			return keccak256(abi.encode(
-				TOKENOP_TYPEHASH,
-				ops[0].tokenId,
-				ops[0].amount
-			));
-		}
-		bytes32[] memory hashes = new bytes32[](ops.length);
-		for (uint256 i = 0; i < ops.length; i++) {
-			hashes[i] = keccak256(abi.encode(
-				TOKENOP_TYPEHASH,
-				ops[i].tokenId,
-				ops[i].amount
-			));
-		}
-		return keccak256(abi.encodePacked(hashes));
 	}
 }
