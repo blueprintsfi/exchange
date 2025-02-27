@@ -180,8 +180,8 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 			Swap calldata swap = swaps[i];
 			bytes32 orderId = keccak256(abi.encode(swap));
 			uint256 ts = cancelled[msg.sender][orderId];
-			if (ts == 0 || ts + swap.delay >= block.timestamp)
-				revert DelayNotPassed();
+			if (ts + swap.delay >= block.timestamp) revert DelayNotPassed();
+			if (ts == 0) revert OrderCancelNotInitialized();
 			fill[msg.sender][orderId] = type(uint256).max;
 			emit OrderCanceled(msg.sender, orderId, type(uint256).max);
 		}

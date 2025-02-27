@@ -49,6 +49,9 @@ interface IfExchange  {
     /// @notice Thrown when trying to initialize cancellation for an order with already initialized cancellation
     error OrderCancelAlreadyInitialized();
 
+	/// @notice Thrown when trying to cancel an order without previous initCancel() call
+	error OrderCancelNotInitialized();
+
     /// @notice Thrown when trying to cancel an order that hasn't been marked for cancellation
     error NotMarkedForCancellation();
 
