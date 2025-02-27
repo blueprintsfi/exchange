@@ -41,7 +41,8 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 	);
 
 	constructor(IBlueprintManager _blueprintManager)
-		BasicBlueprint(_blueprintManager) {}
+		BasicBlueprint(_blueprintManager)
+		EIP712() {}
 
 	function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
 		name = "fExchange";
