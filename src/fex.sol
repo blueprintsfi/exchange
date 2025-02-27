@@ -170,7 +170,7 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 	function initCancel(bytes32[] calldata orderIds) external {
 		for (uint256 i = 0; i < orderIds.length; i++) {
 			if (cancelled[msg.sender][orderIds[i]] != 0)
-				revert OrderAlreadySigned();
+				revert OrderCancelAlreadyInitialized();
 			cancelled[msg.sender][orderIds[i]] = block.timestamp;
 		}
 	}
