@@ -193,11 +193,16 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			subaccount
 		));
 
-		require(SignatureCheckerLib.isValidSignatureNowCalldata(
+		if (
+			!SignatureCheckerLib.isValidSignatureNowCalldata(
 			subaccount,
 			_hashTypedData(subaccountHash),
 			signature
-		));
+			)
+		) {
+			revert InvalidSignature();
+		}
+
 		getMaster[subaccount] = holder;
 	}
 
@@ -249,11 +254,13 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			uint256 previousFill = fill[holder][digest];
 
 			if (previousFill == 0) {
-				require(SignatureCheckerLib.isValidSignatureNowCalldata(
+				if(!SignatureCheckerLib.isValidSignatureNowCalldata(
 					holder,
 					digest,
 					signatures[i]
-				));
+				)){
+					revert InvalidSignature();
+				}
 			} else {
 				previousFill--;
 			}
