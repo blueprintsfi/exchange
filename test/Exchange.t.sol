@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
-import "../src/fex.sol";
+import "../src/Exchange.sol";
 import {TokenOp} from "../lib/core/src/blueprints/BasicBlueprint.sol";
 import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/BlueprintManager.sol";
 
-contract fExchangeFuzzTest is Test {
+contract ExchangeFuzzTest is Test {
 	// Using tabs for indentation.
-	fExchange public exchange;
+	Exchange public exchange;
 	BlueprintManager public blueprintManager;
 	address public user;
 	address public operator;
 	uint256 public constant delay = 1 days;
 
-	// setUp deploys the blueprint manager and fExchange and sets initial token balances.
+	// setUp deploys the blueprint manager and Exchange and sets initial token balances.
 	function setUp() public {
-		// Deploy BlueprintManager and fExchange.
+		// Deploy BlueprintManager and Exchange.
 		blueprintManager = new BlueprintManager();
-		exchange = new fExchange(blueprintManager);
+		exchange = new Exchange(blueprintManager);
 		user = makeAddr("user");
 		operator = makeAddr("operator");
 	}
@@ -318,16 +318,16 @@ contract fExchangeFuzzTest is Test {
 		bytes32 domainSeparator = keccak256(
 			abi.encode(
 				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-				keccak256(bytes("fExchange")),
+				keccak256(bytes("Exchange")),
 				keccak256(bytes("1")),
 				block.chainid,
 				address(exchange)
 			)
 		);
-		
+
 		// Manually compute the digest matching EIP-712
 		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, subaccountHash));
-		
+
 		(uint8 v, bytes32 r, bytes32 s) = vm.sign(subPk, digest);
 		bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -503,16 +503,16 @@ contract fExchangeFuzzTest is Test {
 		bytes32 domainSeparator = keccak256(
 			abi.encode(
 				keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-				keccak256(bytes("fExchange")),
+				keccak256(bytes("Exchange")),
 				keccak256(bytes("1")),
 				block.chainid,
 				address(exchange)
 			)
 		);
-		
+
 		// Manually compute the digest matching EIP-712
 		bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, withdrawHash));
-		
+
 		// Sign with operator's key
 		uint256 operatorPk = uint256(keccak256(abi.encodePacked("operator")));
 		operator = vm.addr(operatorPk);

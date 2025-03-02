@@ -25,9 +25,9 @@ struct UserData {
 	uint256 ragequitTime;
 }
 
-/// @title Interface for fExchange
-/// @notice Contains all errors and events for the fExchange contract
-interface IfExchange  {
+/// @title Interface for Exchange
+/// @notice Contains all errors and events for the Exchange contract
+interface IExchange  {
 	/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
 	error Unauthorized();
 

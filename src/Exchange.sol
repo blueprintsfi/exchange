@@ -6,7 +6,7 @@ import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
-import {IfExchange, UserData, Swap, SwapExecution} from "src/interfaces/Ifex.sol";
+import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
@@ -16,8 +16,7 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract fExchange is BasicBlueprint, EIP712, IfExchange  {
-
+contract Exchange is BasicBlueprint, EIP712, IExchange  {
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
@@ -45,7 +44,7 @@ contract fExchange is BasicBlueprint, EIP712, IfExchange  {
 		EIP712() {}
 
 	function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
-		name = "fExchange";
+		name = "Exchange";
 		version = "1";
 	}
 
