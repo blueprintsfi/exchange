@@ -6,6 +6,7 @@ import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
+import {TypeHashes} from "./lib/TypeHashes.sol";
 import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
@@ -16,28 +17,13 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract Exchange is BasicBlueprint, EIP712, IExchange  {
+contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
 	mapping (address signer => mapping (bytes32 hash => uint256 filled)) public fill;
 	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
 	mapping (address subaccount => address account) public getMaster;
-
-	/// @dev Type hash for the Withdraw struct
-	bytes32 public constant WITHDRAW_TYPEHASH = keccak256(
-		"Withdraw(address holder,uint256 delay,uint256 nonce,TokenOp[] withdrawals)TokenOp(uint256 tokenId,uint256 amount)"
-	);
-
-	/// @dev Type hash for the Subaccount declaration
-	bytes32 public constant SUBACCOUNT_TYPEHASH = keccak256(
-		"SubaccountDeclaration(address holder,address subaccount)"
-	);
-
-	/// @dev Type hash for the Swap struct
-	bytes32 public constant SWAP_TYPEHASH = keccak256(
-		"Swap(address holder,address to,address operator,uint256 delay,uint256 deadlineAndNonce,TokenOp[] inputs,TokenOp[] outputs)TokenOp(uint256 tokenId,uint256 amount)"
-	);
 
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager)
@@ -102,7 +88,6 @@ contract Exchange is BasicBlueprint, EIP712, IExchange  {
 			revert NoRagequitSet();
 		if (ts + delay >= block.timestamp)
 			revert DelayNotPassed();
-
 		uint256 len = withdrawals.length;
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
@@ -179,8 +164,10 @@ contract Exchange is BasicBlueprint, EIP712, IExchange  {
 			Swap calldata swap = swaps[i];
 			bytes32 orderId = keccak256(abi.encode(swap));
 			uint256 ts = cancelled[msg.sender][orderId];
-			if (ts + swap.delay >= block.timestamp) revert DelayNotPassed();
-			if (ts == 0) revert OrderCancelNotInitialized();
+			if (ts + swap.delay >= block.timestamp)
+				revert DelayNotPassed();
+			if (ts == 0)
+				revert OrderCancelNotInitialized();
 			fill[msg.sender][orderId] = type(uint256).max;
 			emit OrderCanceled(msg.sender, orderId, type(uint256).max);
 		}
