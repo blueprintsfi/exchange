@@ -159,12 +159,13 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		blueprintManager.transfer(msg.sender, withdrawals);
 	}
 
-	function signOrder(bytes32 orderId) external {
-		if (fill[msg.sender][orderId] != 0)
-			revert OrderAlreadySigned();
-		fill[msg.sender][orderId] = 1;
-
-		emit OrderSigned(msg.sender, orderId, 1);
+	function signOrder(bytes32[] calldata orderIds) external {
+		for(uint i = 0; i < orderIds.length; i++){
+			if (fill[msg.sender][orderIds[i]] != 0)
+				revert OrderAlreadySigned();
+			fill[msg.sender][orderIds[i]] = 1;
+			emit OrderSigned(msg.sender, orderIds[i], 1);
+		}
 	}
 
 	function initCancel(bytes32[] calldata orderIds) external {
