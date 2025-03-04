@@ -127,6 +127,12 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 				revert Unauthorized();
 		}
 
+		if(holder != msg.sender){
+			if (msg.sender != getMaster[holder])
+				revert Unauthorized();
+		}
+		
+
 		bytes32 withdrawalHash = keccak256(abi.encode(
 			WITHDRAW_TYPEHASH,
 			holder,
