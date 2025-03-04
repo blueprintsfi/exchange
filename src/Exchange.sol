@@ -29,7 +29,10 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		BasicBlueprint(_blueprintManager)
 		EIP712() {}
 
-	function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
+	function _domainNameAndVersion()
+		internal pure override
+		returns (string memory name, string memory version)
+	{
 		name = "Exchange";
 		version = "1";
 	}
@@ -80,20 +83,33 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		emit Unragequit(holder, operator, delay, msg.sender);
 	}
 
-	function rageWithdraw(address holder, address operator, uint256 delay, TokenOp[] calldata withdrawals) external {
-		if (msg.sender != holder && msg.sender != getMaster[holder])
+	function rageWithdraw(
+		address holder,
+		address operator,
+		uint256 delay,
+		TokenOp[] calldata withdrawals
+	) external {
+		if (msg.sender != holder && msg.sender != getMaster[holder]) {
 			revert Unauthorized();
+		}
+
 		uint256 ts = userData[holder][operator][delay].ragequitTime;
-		if (ts == 0)
+		if (ts == 0) {
 			revert NoRagequitSet();
-		if (ts + delay >= block.timestamp)
+		}
+		if (ts + delay >= block.timestamp) {
 			revert DelayNotPassed();
+		}
+
 		uint256 len = withdrawals.length;
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
 			userData[holder][operator][delay].balances[tokenId] -= amount;
 		}
+
+		//note: missing ragequit set to 0
+
 		blueprintManager.transfer(msg.sender, withdrawals);
 	}
 
@@ -110,6 +126,12 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			if (msg.sender != getMaster[holder])
 				revert Unauthorized();
 		}
+
+		if(holder != msg.sender){
+			if (msg.sender != getMaster[holder])
+				revert Unauthorized();
+		}
+		
 
 		bytes32 withdrawalHash = keccak256(abi.encode(
 			WITHDRAW_TYPEHASH,
@@ -183,7 +205,11 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		}
 	}
 
-	function declareSubaccount(address holder, address subaccount, bytes calldata signature) external {
+	function declareSubaccount(
+		address holder,
+		address subaccount,
+		bytes calldata signature
+	) external {
 		if (getMaster[subaccount] != address(0))
 			revert SubaccountAlreadyDeclared();
 
@@ -206,7 +232,11 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		getMaster[subaccount] = holder;
 	}
 
-	function getSwapData(Swap calldata swap, uint256 previousFill, uint256 newFill) internal pure returns (
+	function getSwapData(
+		Swap calldata swap,
+		uint256 previousFill,
+		uint256 newFill
+	) internal pure returns (
 		uint256 amountInGcd,
 		uint256 amountOutGcd,
 		uint256 amountIn
