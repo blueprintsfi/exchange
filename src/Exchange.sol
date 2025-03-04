@@ -6,7 +6,7 @@ import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
-import {TypeHashes} from "./lib/TypeHashes.sol";
+import {TypeHashes} from "./libraries/TypeHashes.sol";
 import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
@@ -126,12 +126,6 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			if (msg.sender != getMaster[holder])
 				revert Unauthorized();
 		}
-
-		if(holder != msg.sender){
-			if (msg.sender != getMaster[holder])
-				revert Unauthorized();
-		}
-		
 
 		bytes32 withdrawalHash = keccak256(abi.encode(
 			WITHDRAW_TYPEHASH,

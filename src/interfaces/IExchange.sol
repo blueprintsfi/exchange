@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 
-
 struct Swap {
 	address holder;
 	address operator;
