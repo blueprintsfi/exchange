@@ -5,10 +5,12 @@ import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 
 struct Swap {
 	address holder;
+	uint256 holderSubaccount;
+	address to;
+	uint256 toSubaccount;
 	address operator;
 	uint256 delay;
 	uint256 deadlineAndNonce;
-	address to;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 }
@@ -19,7 +21,7 @@ struct SwapExecution {
 }
 
 struct UserData {
-	mapping (uint256 tokenId => uint256 balance) balances;
+	mapping (uint256 subaccount => mapping (uint256 tokenId => uint256 balance)) balances;
 	uint256 nonce;
 	uint256 ragequitTime;
 }
@@ -72,6 +74,9 @@ interface IExchange  {
 	/// @notice Thrown when the nonce provided is invalid
 	error InvalidNonce();
 
+	/// @notice Thrown when the subaccount declaration with a signature passed the deadline
+	error DeadlinePassed();
+
 	/// @notice Emitted when tokens are deposited into the exchange
 	/// @param depositFor The address receiving the deposit
 	/// @param operator The operator address
@@ -113,21 +118,17 @@ interface IExchange  {
 	/// @notice Emitted when an order is signed
 	/// @param holder The address signing the order
 	/// @param orderId The unique identifier of the order
-	/// @param fill The fill amount (always 1 for signing)
 	event OrderSigned(
 		address indexed holder,
-		bytes32 indexed orderId,
-		uint256 fill
+		bytes32 indexed orderId
 	);
 
 	/// @notice Emitted when an order is canceled
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
-	/// @param fill The fill amount (always type(uint256).max for cancellation)
 	event OrderCanceled(
 		address indexed holder,
-		bytes32 indexed orderId,
-		uint256 fill
+		bytes32 indexed orderId
 	);
 
 	/// @notice Emitted when an order is canceled by the operator

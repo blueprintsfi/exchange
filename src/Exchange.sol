@@ -6,7 +6,7 @@ import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
-import {TypeHashes} from "./libraries/TypeHashes.sol";
+import "./libraries/TypeHashes.sol";
 import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
@@ -17,10 +17,17 @@ function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
 		res = gcd(res, ops[i].amount);
 }
 
-contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
+function isValidSig(address signer, bytes32 hash, bytes calldata signature) returns (bool) {
+	return SignatureCheckerLib.isValidSignatureNowCalldata(signer, hash, signature);
+}
+
+contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
+	mapping (address holder =>
+		mapping (uint256 subaccount =>
+			mapping (address signer => bool isSigner))) public signers;
 	mapping (address signer => mapping (bytes32 hash => uint256 filled)) public fill;
 	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
 	mapping (address subaccount => address account) public getMaster;
@@ -29,10 +36,10 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		BasicBlueprint(_blueprintManager)
 		EIP712() {}
 
-	function _domainNameAndVersion()
-		internal pure override
-		returns (string memory name, string memory version)
-	{
+	function _domainNameAndVersion() internal pure override returns (
+		string memory name,
+		string memory version
+	) {
 		name = "Exchange";
 		version = "1";
 	}
@@ -44,12 +51,15 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		TokenOp[] memory /*give*/,
 		TokenOp[] memory /*take*/
 	) {
-		(address depositFor, address operator, uint256 delay, TokenOp[] memory deposits) =
-			abi.decode(action, (address, address, uint256, TokenOp[]));
+		(address depositFor, uint256 subaccount, address operator, uint256 delay, TokenOp[] memory deposits) =
+			abi.decode(action, (address, uint256, address, uint256, TokenOp[]));
+
+		mapping (uint256 tokenId => uint256 balance) storage balances =
+			userData[depositFor][operator][delay].balances[subaccount];
 
 		uint256 len = deposits.length;
 		for (uint256 i = 0; i < len; i++)
-			userData[depositFor][operator][delay].balances[deposits[i].tokenId] += deposits[i].amount;
+			balances[deposits[i].tokenId] += deposits[i].amount;
 
 		emit Deposit(depositFor, operator, delay, deposits);
 
@@ -58,15 +68,26 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 
 	function getBalance(
 		address holder,
+		uint256 subaccount,
 		address operator,
 		uint256 delay,
 		uint256 tokenId
 	) external view returns (uint256 balance) {
-		balance = userData[holder][operator][delay].balances[tokenId];
+		balance = userData[holder][operator][delay].balances[tokenId][subaccount];
+	}
+
+	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
+		if (sender == holder)
+			return true;
+		if (subaccount != 0) {
+			if (signers[holder][subaccount][sender])
+				return true;
+		}
+		return signers[holder][0][sender];
 	}
 
 	function ragequit(address holder, address operator, uint256 delay) external {
-		if (msg.sender != holder && msg.sender != getMaster[holder])
+		if (!hasAccess(msg.sender, holder, 0))
 			revert Unauthorized();
 		if (userData[holder][operator][delay].ragequitTime != 0)
 			revert RagequitAlreadySet();
@@ -75,7 +96,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 	}
 
 	function unragequit(address holder, address operator, uint256 delay) external {
-		if (msg.sender != holder && msg.sender != getMaster[holder])
+		if (!hasAccess(msg.sender, holder, 0))
 			revert Unauthorized();
 		if (userData[holder][operator][delay].ragequitTime == 0)
 			revert NoRagequitSet();
@@ -85,36 +106,34 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 
 	function rageWithdraw(
 		address holder,
+		uint256 subaccount,
+		address to,
 		address operator,
 		uint256 delay,
 		TokenOp[] calldata withdrawals
 	) external {
-		if (msg.sender != holder && msg.sender != getMaster[holder]) {
+		if (!hasAccess(msg.sender, holder, 0))
 			revert Unauthorized();
-		}
 
 		uint256 ts = userData[holder][operator][delay].ragequitTime;
-		if (ts == 0) {
+		if (ts == 0)
 			revert NoRagequitSet();
-		}
-		if (ts + delay >= block.timestamp) {
+		if (ts + delay >= block.timestamp)
 			revert DelayNotPassed();
-		}
 
 		uint256 len = withdrawals.length;
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			userData[holder][operator][delay].balances[tokenId] -= amount;
+			userData[holder][operator][delay].balances[subaccount][tokenId] -= amount;
 		}
 
-		//note: missing ragequit set to 0
-
-		blueprintManager.transfer(msg.sender, withdrawals);
+		blueprintManager.transfer(to, withdrawals);
 	}
 
 	function withdraw(
 		address holder,
+		uint256 subaccount,
 		address to,
 		address operator,
 		uint256 delay,
@@ -122,8 +141,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		TokenOp[] calldata withdrawals,
 		bytes calldata signature
 	) external {
-		if (holder != msg.sender && holder != to) {
-			if (msg.sender != getMaster[holder])
+		if (holder != to) {
+			if (!hasAccess(msg.sender, holder, subaccount))
 				revert Unauthorized();
 		}
 
@@ -135,15 +154,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			withdrawals
 		));
 
-		if (
-			!SignatureCheckerLib.isValidSignatureNowCalldata(
-				operator,
-				_hashTypedData(withdrawalHash),
-				signature
-			)
-		) {
+		if (!isValidSig(operator, _hashTypedData(withdrawalHash), signature))
 			revert InvalidSignature();
-		}
 
 		if (userData[holder][operator][delay].nonce >= nonce) {
 			revert InvalidNonce();
@@ -154,17 +166,17 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			userData[msg.sender][operator][delay].balances[tokenId] -= amount;
+			userData[msg.sender][operator][delay].balances[subaccount][tokenId] -= amount;
 		}
-		blueprintManager.transfer(msg.sender, withdrawals);
+		blueprintManager.transfer(to, withdrawals);
 	}
 
 	function signOrder(bytes32[] calldata orderIds) external {
-		for(uint i = 0; i < orderIds.length; i++){
+		for(uint256 i = 0; i < orderIds.length; i++) {
 			if (fill[msg.sender][orderIds[i]] != 0)
 				revert OrderAlreadySigned();
 			fill[msg.sender][orderIds[i]] = 1;
-			emit OrderSigned(msg.sender, orderIds[i], 1);
+			emit OrderSigned(msg.sender, orderIds[i]);
 		}
 	}
 
@@ -186,7 +198,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			if (ts == 0)
 				revert OrderCancelNotInitialized();
 			fill[msg.sender][orderId] = type(uint256).max;
-			emit OrderCanceled(msg.sender, orderId, type(uint256).max);
+			emit OrderCanceled(msg.sender, orderId);
 		}
 	}
 
@@ -200,31 +212,56 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 		}
 	}
 
-	function declareSubaccount(
+	function addSigner(
 		address holder,
-		address subaccount,
+		uint256 subaccount,
+		address signer,
+		uint256 deadline,
 		bytes calldata signature
 	) external {
-		if (getMaster[subaccount] != address(0))
-			revert SubaccountAlreadyDeclared();
+		if (!hasAccess(msg.sender, holder, 0)) {
+			if (block.timestamp > deadline)
+				revert DeadlinePassed();
 
-		bytes32 subaccountHash = keccak256(abi.encode(
-			SUBACCOUNT_TYPEHASH,
-			holder,
-			subaccount
-		));
+			bytes32 subaccountHash = keccak256(abi.encode(
+				ADD_SIGNER_TYPEHASH,
+				holder,
+				subaccount,
+				signer,
+				deadline
+			));
 
-		if (
-			!SignatureCheckerLib.isValidSignatureNowCalldata(
-			subaccount,
-			_hashTypedData(subaccountHash),
-			signature
-			)
-		) {
-			revert InvalidSignature();
+			if (!isValidSig(holder, _hashTypedData(subaccountHash), signature))
+				revert InvalidSignature();
 		}
 
-		getMaster[subaccount] = holder;
+		signers[holder][subaccount][signer] = true;
+	}
+
+	function removeSigner(
+		address holder,
+		uint256 subaccount,
+		address signer,
+		uint256 deadline,
+		bytes calldata signature
+	) external {
+		if (!hasAccess(msg.sender, holder, 0)) {
+			if (block.timestamp > deadline)
+				revert DeadlinePassed();
+
+			bytes32 subaccountHash = keccak256(abi.encode(
+				REMOVE_SIGNER_TYPEHASH,
+				holder,
+				subaccount,
+				signer,
+				deadline
+			));
+
+			if (!isValidSig(holder, _hashTypedData(subaccountHash), signature))
+				revert InvalidSignature();
+		}
+
+		signers[holder][subaccount][signer] = false;
 	}
 
 	function getSwapData(
@@ -255,7 +292,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			Swap calldata swap = swapEx.swap;
 			address holder = swap.holder;
 			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
-			UserData storage toState = userData[swap.to][msg.sender][swap.delay]; // todo: consider allowing changing the delay and/or the operator
+			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
@@ -279,13 +316,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			uint256 previousFill = fill[holder][digest];
 
 			if (previousFill == 0) {
-				if(!SignatureCheckerLib.isValidSignatureNowCalldata(
-					holder,
-					digest,
-					signatures[i]
-				)){
+				if (!isValidSig(holder, digest, signatures[i]))
 					revert InvalidSignature();
-				}
 			} else {
 				previousFill--;
 			}
@@ -293,23 +325,29 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 			fill[holder][digest] = newFill + 1;
 			emit OrderSwapped(holder, digest, newFill + 1);
 
-			(
-				uint256 inGcd,
-				uint256 outGcd,
-				uint256 amountIn
-			) = getSwapData(swap, previousFill, newFill);
+			(uint256 inGcd, uint256 outGcd, uint256 amountIn) = getSwapData(
+				swap,
+				previousFill,
+				newFill
+			);
 
-			addFlashOps(swap.inputs, getSlot(operatorState), getSlot(userState), inGcd, amountIn);
-			addFlashOps(swap.outputs, getSlot(toState), getSlot(operatorState), outGcd, amountIn);
+			uint256 userSlot = getSlot(userState.balances[swap.holderSubaccount]);
+			uint256 toSlot = getSlot(toState.balances[swap.toSubaccount]);
+			uint256 operatorSlot = getSlot(operatorState.balances[0]);
+
+			addFlashOps(swap.inputs, operatorSlot, userSlot, inGcd, amountIn);
+			addFlashOps(swap.outputs, toSlot, operatorSlot, outGcd, amountIn);
 		}
 
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i].swap;
-			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
-			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
+			mapping (uint256 tokenId => uint256 balance) storage userBalances =
+				userData[swap.holder][msg.sender][swap.delay].balances[swap.holderSubaccount];
+			mapping (uint256 tokenId => uint256 balance) storage toBalances =
+				userData[swap.to][msg.sender][swap.delay].balances[swap.toSubaccount];
 
-			settleFlashOps(swap.inputs, userState, operatorState);
-			settleFlashOps(swap.outputs, toState, operatorState);
+			settleFlashOps(swap.inputs, userBalances, operatorState.balances[0]);
+			settleFlashOps(swap.outputs, toBalances, operatorState.balances[0]);
 		}
 	}
 
@@ -330,32 +368,36 @@ contract Exchange is BasicBlueprint, IExchange, EIP712, TypeHashes {
 	}
 
 	// note: this function just returns the argument, check if this causes additional gas usage
-	function getSlot(UserData storage state) internal view returns (uint256 slot) {
-		mapping (uint256 => uint256) storage balances = state.balances;
+	function getSlot(
+		mapping (uint256 tokenId => uint256 balance) storage balances
+	) internal view returns (uint256 slot) {
 		assembly ("memory-safe") {
 			slot := balances.slot
 		}
 	}
 
-	function settleFlashOp(uint256 id, UserData storage state) internal {
+	function settleFlashOp(
+		mapping (uint256 tokenId => uint256 balance) storage balances,
+		uint256 id
+	) internal {
 		(uint256 positive, uint256 negative) =
-			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(state)));
+			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(balances)));
 
 		if (positive != 0)
-			state.balances[id] += positive;
+			balances[id] += positive;
 		else if (negative != 0)
-			state.balances[id] -= negative;
+			balances[id] -= negative;
 	}
 
 	function settleFlashOps(
 		TokenOp[] calldata array,
-		UserData storage state0,
-		UserData storage state1
+		mapping (uint256 tokenId => uint256 balance) storage balances0,
+		mapping (uint256 tokenId => uint256 balance) storage balances1
 	) internal {
 		for (uint256 i = 0; i < array.length; i++) {
 			uint256 id = array[i].tokenId;
-			settleFlashOp(id, state0);
-			settleFlashOp(id, state1);
+			settleFlashOp(id, balances0);
+			settleFlashOp(id, balances1);
 		}
 	}
 }
