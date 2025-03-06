@@ -3,10 +3,11 @@ pragma solidity ^0.8.13;
 
 import {gcd} from "core/libraries/Math.sol";
 import {HashLib} from "core/libraries/HashLib.sol";
+import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
-import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
-import "./libraries/TypeHashes.sol";
+import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
+import {TypeHashes} from "./libraries/TypeHashes.sol";
 import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
@@ -22,6 +23,7 @@ function isValidSig(address signer, bytes32 hash, bytes calldata signature) retu
 }
 
 contract Exchange is BasicBlueprint, IExchange, EIP712 {
+
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
@@ -79,10 +81,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
 		if (sender == holder)
 			return true;
-		if (subaccount != 0) {
-			if (signers[holder][subaccount][sender])
-				return true;
-		}
+		if (subaccount != 0)
+			return signers[holder][subaccount][sender];
 		return signers[holder][0][sender];
 	}
 
@@ -142,24 +142,23 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		bytes calldata signature
 	) external {
 		if (holder != to) {
-			if (!hasAccess(msg.sender, holder, subaccount))
-				revert Unauthorized();
-		}
+  			if (!hasAccess(msg.sender, holder, subaccount))
+    			revert Unauthorized();
+  		}
 
-		bytes32 withdrawalHash = keccak256(abi.encode(
-			WITHDRAW_TYPEHASH,
+		bytes32 withdrawalHash = TypedDataHashLib.hashWithdraw(
 			holder,
 			delay,
 			nonce,
 			withdrawals
-		));
+		);
 
 		if (!isValidSig(operator, _hashTypedData(withdrawalHash), signature))
 			revert InvalidSignature();
 
-		if (userData[holder][operator][delay].nonce >= nonce) {
+		if (userData[holder][operator][delay].nonce >= nonce)
 			revert InvalidNonce();
-		}
+
 		userData[holder][operator][delay].nonce = nonce;
 
 		uint256 len = withdrawals.length;
@@ -223,13 +222,12 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			if (block.timestamp > deadline)
 				revert DeadlinePassed();
 
-			bytes32 subaccountHash = keccak256(abi.encode(
-				ADD_SIGNER_TYPEHASH,
+			bytes32 subaccountHash = TypedDataHashLib.hashAddSigner(
 				holder,
 				subaccount,
 				signer,
 				deadline
-			));
+			);
 
 			if (!isValidSig(holder, _hashTypedData(subaccountHash), signature))
 				revert InvalidSignature();
@@ -249,13 +247,12 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			if (block.timestamp > deadline)
 				revert DeadlinePassed();
 
-			bytes32 subaccountHash = keccak256(abi.encode(
-				REMOVE_SIGNER_TYPEHASH,
+			bytes32 subaccountHash = TypedDataHashLib.hashRemoveSigner(
 				holder,
 				subaccount,
 				signer,
 				deadline
-			));
+			);
 
 			if (!isValidSig(holder, _hashTypedData(subaccountHash), signature))
 				revert InvalidSignature();
@@ -293,14 +290,14 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			address holder = swap.holder;
 			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
 			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
+			// note: allow for swaps between balances with different delays
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
 			if (swap.operator != msg.sender)  // todo: operator shouldn't be in calldata then
 				revert WrongOperator();
 
-			bytes32 swapHash = keccak256(abi.encode(
-				SWAP_TYPEHASH,
+			bytes32 swapHash = TypedDataHashLib.hashSwap(
 				swap.holder,
 				swap.to,
 				swap.operator,
@@ -308,7 +305,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 				swap.deadlineAndNonce,
 				swap.inputs,
 				swap.outputs
-			));
+			);
 
 			// Note: The computed digest serves as the order identifier (orderId) for this swap.
 			bytes32 digest = _hashTypedData(swapHash);
@@ -316,12 +313,14 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			uint256 previousFill = fill[holder][digest];
 
 			if (previousFill == 0) {
+				// change holder -> signer from swapExecution
+				// todo: add check whether signer has access to subaccount
 				if (!isValidSig(holder, digest, signatures[i]))
 					revert InvalidSignature();
 			} else {
 				previousFill--;
 			}
-			uint256 newFill = previousFill + swapEx.output; // todo revert overflow no message
+			uint256 newFill = previousFill + swapEx.output; // todo: revert overflow no message
 			fill[holder][digest] = newFill + 1;
 			emit OrderSwapped(holder, digest, newFill + 1);
 
@@ -377,8 +376,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	}
 
 	function settleFlashOp(
-		mapping (uint256 tokenId => uint256 balance) storage balances,
-		uint256 id
+		uint256 id,
+		mapping (uint256 tokenId => uint256 balance) storage balances
 	) internal {
 		(uint256 positive, uint256 negative) =
 			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(balances)));
