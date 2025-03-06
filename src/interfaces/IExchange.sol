@@ -123,6 +123,14 @@ interface IExchange  {
 		bytes32 indexed orderId
 	);
 
+	/// @notice Emitted when an order is marked for cancellation
+	/// @param holder The address that owns the order
+	/// @param orderId The unique identifier of the order
+	event InitCancel(
+		address indexed holder,
+		bytes32 indexed orderId
+	);
+
 	/// @notice Emitted when an order is canceled
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
@@ -135,12 +143,10 @@ interface IExchange  {
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
 	/// @param operator The operator that canceled the order
-	/// @param fill The fill amount (always type(uint256).max for cancellation)
 	event OrderOperatorCanceled(
 		address indexed holder,
 		bytes32 indexed orderId,
-		address indexed operator,
-		uint256 fill
+		address indexed operator
 	);
 
 	/// @notice Emitted when an order is filled via swap
@@ -151,5 +157,58 @@ interface IExchange  {
 		address indexed holder,
 		bytes32 indexed orderId,
 		uint256 fill
+	);
+
+
+	/// @notice Emitted when a withdrawal is performed
+	/// @param holder The address withdrawing funds
+	/// @param subaccount The subaccount identifier
+	/// @param to The recipient address
+	/// @param operator The operator address
+	/// @param delay The delay period
+	/// @param withdrawals Array of token operations being withdrawn
+	event Withdraw(
+		address indexed holder,
+		uint256 subaccount,
+		address indexed to,
+		address indexed operator,
+		uint256 delay,
+		TokenOp[] withdrawals
+	);
+
+	/// @notice Emitted when a rage withdrawal is performed
+	/// @param holder The address withdrawing funds
+	/// @param subaccount The subaccount identifier
+	/// @param to The recipient address
+	/// @param operator The operator address
+	/// @param delay The delay period
+	/// @param withdrawals Array of token operations being withdrawn
+	event RageWithdraw(
+		address indexed holder,
+		uint256 subaccount,
+		address indexed to,
+		address indexed operator,
+		uint256 delay,
+		TokenOp[] withdrawals
+	);
+
+	/// @notice Emitted when a signer is added to a subaccount
+	/// @param holder The address of the account holder
+	/// @param subaccount The subaccount identifier
+	/// @param signer The address being added as a signer
+	event AddSigner(
+		address indexed holder,
+		uint256 indexed subaccount,
+		address indexed signer
+	);
+
+	/// @notice Emitted when a signer is removed from a subaccount
+	/// @param holder The address of the account holder
+	/// @param subaccount The subaccount identifier
+	/// @param signer The address being removed as a signer
+	event RemoveSigner(
+		address indexed holder,
+		uint256 indexed subaccount,
+		address indexed signer
 	);
 }

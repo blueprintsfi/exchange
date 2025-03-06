@@ -129,6 +129,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		}
 
 		blueprintManager.transfer(to, withdrawals);
+		emit RageWithdraw(holder, subaccount, to, operator, delay, withdrawals);
 	}
 
 	function withdraw(
@@ -168,6 +169,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			userData[msg.sender][operator][delay].balances[subaccount][tokenId] -= amount;
 		}
 		blueprintManager.transfer(to, withdrawals);
+		emit Withdraw(holder, subaccount, to, operator, delay, withdrawals);
 	}
 
 	function signOrder(bytes32[] calldata orderIds) external {
@@ -184,6 +186,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			if (cancelled[msg.sender][orderIds[i]] != 0)
 				revert OrderCancelAlreadyInitialized();
 			cancelled[msg.sender][orderIds[i]] = block.timestamp;
+			emit InitCancel(msg.sender, orderIds[i]);
 		}
 	}
 
@@ -207,7 +210,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			require(swap.operator == msg.sender);
 			bytes32 orderId = keccak256(abi.encode(swap));
 			fill[swap.holder][orderId] = type(uint256).max;
-			emit OrderOperatorCanceled(swap.holder, orderId, msg.sender, type(uint256).max);
+			emit OrderOperatorCanceled(swap.holder, orderId, msg.sender);
 		}
 	}
 
@@ -234,6 +237,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		}
 
 		signers[holder][subaccount][signer] = true;
+		emit AddSigner(holder, subaccount, signer);
 	}
 
 	function removeSigner(
@@ -259,6 +263,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		}
 
 		signers[holder][subaccount][signer] = false;
+		emit RemoveSigner(holder, subaccount, signer);
 	}
 
 	function getSwapData(
