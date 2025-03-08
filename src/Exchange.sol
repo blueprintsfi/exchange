@@ -167,7 +167,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		for (uint256 i = 0; i < len; i++) {
 			uint256 tokenId = withdrawals[i].tokenId;
 			uint256 amount = withdrawals[i].amount;
-			userData[msg.sender][operator][delay].balances[subaccount][tokenId] -= amount;
+			userData[holder][operator][delay].balances[subaccount][tokenId] -= amount;
 		}
 		blueprintManager.transfer(to, withdrawals);
 		emit Withdraw(holder, subaccount, to, operator, delay, withdrawals);
