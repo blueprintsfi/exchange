@@ -291,22 +291,21 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	function executeSwaps(SwapExecution[] calldata swaps, bytes[] calldata signatures) external {
 		UserData storage operatorState = userData[msg.sender][msg.sender][0];
 		for (uint256 i = 0; i < swaps.length; i++) {
-			SwapExecution calldata swapEx = swaps[i];
-			Swap calldata swap = swapEx.swap;
+			Swap calldata swap = swaps[i].swap;
+
 			address holder = swap.holder;
+
 			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
 			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
 			// note: allow for swaps between balances with different delays
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
-			if (swap.operator != msg.sender)  // todo: operator shouldn't be in calldata then
-				revert WrongOperator();
 
 			bytes32 swapHash = TypedDataHashLib.hashSwap(
 				swap.holder,
 				swap.to,
-				swap.operator,
+				msg.sender,
 				swap.delay,
 				swap.deadlineAndNonce,
 				swap.inputs,
@@ -326,7 +325,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			} else {
 				previousFill--;
 			}
-			uint256 newFill = previousFill + swapEx.output; // todo: revert overflow no message
+			uint256 newFill = previousFill + swaps[i].output; // todo: revert overflow no message
 			fill[holder][digest] = newFill + 1;
 			emit OrderSwapped(holder, digest, newFill + 1);
 
