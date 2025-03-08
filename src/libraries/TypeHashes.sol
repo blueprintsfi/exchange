@@ -12,6 +12,7 @@ library TypeHashes {
 	bytes32 public constant WITHDRAW_TYPEHASH = keccak256(
 		"Withdraw("
 			"address holder,"
+			"uint256 subaccount,"
 			"uint256 delay,"
 			"uint256 nonce,"
 			"TokenOp[] withdrawals"

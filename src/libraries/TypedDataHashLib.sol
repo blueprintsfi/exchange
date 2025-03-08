@@ -31,6 +31,7 @@ library TypedDataHashLib {
 
 	function hashWithdraw(
 		address holder,
+		uint256 subaccount,
 		uint256 delay,
 		uint256 nonce,
 		TokenOp[] calldata withdrawals
@@ -42,10 +43,11 @@ library TypedDataHashLib {
 			let ptr := mload(0x40)
 			mstore(ptr, typeHash)
 			mstore(add(ptr, 0x20), and(holder, ADDRESS_MASK))
-			mstore(add(ptr, 0x40), delay)
-			mstore(add(ptr, 0x60), nonce)
-			mstore(add(ptr, 0x80), withdrawalsHash)
-			result := keccak256(ptr, 0xA0)
+			mstore(add(ptr, 0x40), subaccount)
+			mstore(add(ptr, 0x60), delay)
+			mstore(add(ptr, 0x80), nonce)
+			mstore(add(ptr, 0xA0), withdrawalsHash)
+			result := keccak256(ptr, 0xC0)
 		}
 	}
 

@@ -149,6 +149,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 		bytes32 withdrawalHash = TypedDataHashLib.hashWithdraw(
 			holder,
+			subaccount,
 			delay,
 			nonce,
 			withdrawals
