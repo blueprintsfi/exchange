@@ -75,7 +75,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		uint256 delay,
 		uint256 tokenId
 	) external view returns (uint256 balance) {
-		balance = userData[holder][operator][delay].balances[tokenId][subaccount];
+		balance = userData[holder][operator][delay].balances[subaccount][tokenId];
 	}
 
 	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
