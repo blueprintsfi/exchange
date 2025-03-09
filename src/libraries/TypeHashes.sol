@@ -26,7 +26,9 @@ library TypeHashes {
 	bytes32 public constant SWAP_TYPEHASH = keccak256(
 		"Swap("
 			"address holder,"
+			"uint256 holderSubaccount,"
 			"address to,"
+			"uint256 toSubaccount,"
 			"address operator,"
 			"uint256 delay,"
 			"uint256 deadlineAndNonce,"

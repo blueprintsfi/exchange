@@ -53,7 +53,9 @@ library TypedDataHashLib {
 
 	function hashSwap(
 		address holder,
+		uint256 holderSubaccount,
 		address to,
+		uint256 toSubaccount,
 		address operator,
 		uint256 delay,
 		uint256 deadlineAndNonce,
@@ -68,13 +70,15 @@ library TypedDataHashLib {
 			let ptr := mload(0x40)
 			mstore(ptr, typeHash)
 			mstore(add(ptr, 0x20), and(holder, ADDRESS_MASK))
-			mstore(add(ptr, 0x40), and(to, ADDRESS_MASK))
-			mstore(add(ptr, 0x60), and(operator, ADDRESS_MASK))
-			mstore(add(ptr, 0x80), delay)
-			mstore(add(ptr, 0xA0), deadlineAndNonce)
-			mstore(add(ptr, 0xC0), inputsHash)
-			mstore(add(ptr, 0xE0), outputsHash)
-			result := keccak256(ptr, 0x100)
+			mstore(add(ptr, 0x40), holderSubaccount)
+			mstore(add(ptr, 0x60), and(to, ADDRESS_MASK))
+			mstore(add(ptr, 0x80), toSubaccount)
+			mstore(add(ptr, 0xA0), and(operator, ADDRESS_MASK))
+			mstore(add(ptr, 0xC0), delay)
+			mstore(add(ptr, 0xE0), deadlineAndNonce)
+			mstore(add(ptr, 0x100), inputsHash)
+			mstore(add(ptr, 0x120), outputsHash)
+			result := keccak256(ptr, 0x140)
 		}
 	}
 

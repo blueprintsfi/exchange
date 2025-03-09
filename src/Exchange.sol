@@ -304,7 +304,9 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 			bytes32 swapHash = TypedDataHashLib.hashSwap(
 				swap.holder,
+				swap.holderSubaccount,
 				swap.to,
+				swap.toSubaccount,
 				msg.sender,
 				swap.delay,
 				swap.deadlineAndNonce,
@@ -318,8 +320,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			uint256 previousFill = fill[holder][digest];
 
 			if (previousFill == 0) {
-				// change holder -> signer from swapExecution
-				// todo: add check whether signer has access to subaccount
+				// change holder -> signer from Swap
+				// todo: add signer field to Swap and check whether signer has access to subaccount
 				if (!isValidSig(holder, digest, signatures[i]))
 					revert InvalidSignature();
 			} else {
