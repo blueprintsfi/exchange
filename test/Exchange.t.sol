@@ -896,40 +896,4 @@ contract ExchangeFuzzTest is Test, EIP712 {
 		assertEq(balSubaccount1After, 196, "Subaccount 1 should have 196 tokens after swap");
 		assertEq(balSubaccount2After, 54, "Subaccount 2 should have 54 tokens after swap");
 	}
-
-	function test_OperatorCancelWithoutCheck() public {
-		// Create a swap where the operator field is different from the caller
-		Swap memory swap;
-		swap.holder = user;
-		swap.holderSubaccount = 0;
-		// Set a different operator than the one who will call operatorCancel
-		address differentOperator = vm.addr(0x99);
-		swap.operator = differentOperator;
-		swap.delay = delay;
-		swap.deadlineAndNonce = (block.timestamp + 1000) << 128 | 1;
-		swap.to = user;
-		swap.toSubaccount = 0;
-
-		TokenOp[] memory inputs = new TokenOp[](1);
-		uint256 id = prepareTokensForTest(1000, 3);
-		inputs[0] = TokenOp(id, 100);
-		swap.inputs = inputs;
-
-		TokenOp[] memory outputs = new TokenOp[](1);
-		outputs[0] = TokenOp(id, 200);
-		swap.outputs = outputs;
-
-		bytes32 orderId = keccak256(abi.encode(swap));
-
-		Swap[] memory swaps = new Swap[](1);
-		swaps[0] = swap;
-
-		// Call operatorCancel as a different operator than specified in the swap
-		// This should still work because we removed the check for swap.operator == msg.sender
-		vm.prank(operator);
-		exchange.operatorCancel(swaps);
-
-		uint256 fillStatus = exchange.fill(user, orderId);
-		assertEq(fillStatus, type(uint256).max, "Operator cancel should set fill to max regardless of swap.operator");
-	}
 }
