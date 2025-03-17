@@ -7,7 +7,6 @@ import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
-import {TypeHashes} from "./libraries/TypeHashes.sol";
 import {IExchange, UserData, Swap, SwapExecution} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";

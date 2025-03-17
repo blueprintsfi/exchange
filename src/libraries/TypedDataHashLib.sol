@@ -2,14 +2,14 @@
 pragma solidity ^0.8.13;
 
 import {TokenOp} from "../../lib/core/src/interfaces/IBlueprintManager.sol";
-import {TypeHashes} from "./TypeHashes.sol";
+import "./TypeHashes.sol";
 
 library TypedDataHashLib {
 	// Hardcoded value for address mask (type(uint160).max)
 	uint256 private constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
 
 	function hashTokenOps(TokenOp[] calldata ops) public pure returns (bytes32 result) {
-		bytes32 typeHash = TypeHashes.TOKENOP_TYPEHASH;
+		bytes32 typeHash = TOKENOP_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
@@ -37,7 +37,7 @@ library TypedDataHashLib {
 		TokenOp[] calldata withdrawals
 	) public pure returns (bytes32 result) {
 		bytes32 withdrawalsHash = hashTokenOps(withdrawals);
-		bytes32 typeHash = TypeHashes.WITHDRAW_TYPEHASH;
+		bytes32 typeHash = WITHDRAW_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
@@ -64,7 +64,7 @@ library TypedDataHashLib {
 	) public pure returns (bytes32 result) {
 		bytes32 inputsHash = hashTokenOps(inputs);
 		bytes32 outputsHash = hashTokenOps(outputs);
-		bytes32 typeHash = TypeHashes.SWAP_TYPEHASH;
+		bytes32 typeHash = SWAP_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
@@ -88,7 +88,7 @@ library TypedDataHashLib {
 		address signer,
 		uint256 deadline
 	) public pure returns (bytes32 result) {
-		bytes32 typeHash = TypeHashes.ADD_SIGNER_TYPEHASH;
+		bytes32 typeHash = ADD_SIGNER_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
@@ -107,7 +107,7 @@ library TypedDataHashLib {
 		address signer,
 		uint256 deadline
 	) public pure returns (bytes32 result) {
-		bytes32 typeHash = TypeHashes.REMOVE_SIGNER_TYPEHASH;
+		bytes32 typeHash = REMOVE_SIGNER_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
@@ -124,7 +124,7 @@ library TypedDataHashLib {
 		address holder,
 		address subaccount
 	) public pure returns (bytes32 result) {
-		bytes32 typeHash = TypeHashes.SUBACCOUNT_TYPEHASH;
+		bytes32 typeHash = SUBACCOUNT_TYPEHASH;
 
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
