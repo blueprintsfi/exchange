@@ -5,8 +5,8 @@ import {TokenOp} from "../../lib/core/src/interfaces/IBlueprintManager.sol";
 import "./TypeHashes.sol";
 
 library TypedDataHashLib {
-	// Hardcoded value for address mask (type(uint160).max)
-	uint256 private constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
+	// type(uint160).max
+	uint256 public constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
 
 	function hashTokenOps(TokenOp[] calldata ops) public pure returns (bytes32 result) {
 		bytes32 typeHash = TOKENOP_TYPEHASH;
@@ -46,8 +46,8 @@ library TypedDataHashLib {
 			mstore(add(ptr, 0x40), subaccount)
 			mstore(add(ptr, 0x60), delay)
 			mstore(add(ptr, 0x80), nonce)
-			mstore(add(ptr, 0xA0), withdrawalsHash)
-			result := keccak256(ptr, 0xC0)
+			mstore(add(ptr, 0xa0), withdrawalsHash)
+			result := keccak256(ptr, 0xc0)
 		}
 	}
 
@@ -73,9 +73,9 @@ library TypedDataHashLib {
 			mstore(add(ptr, 0x40), holderSubaccount)
 			mstore(add(ptr, 0x60), and(to, ADDRESS_MASK))
 			mstore(add(ptr, 0x80), toSubaccount)
-			mstore(add(ptr, 0xA0), and(operator, ADDRESS_MASK))
-			mstore(add(ptr, 0xC0), delay)
-			mstore(add(ptr, 0xE0), deadlineAndNonce)
+			mstore(add(ptr, 0xa0), and(operator, ADDRESS_MASK))
+			mstore(add(ptr, 0xc0), delay)
+			mstore(add(ptr, 0xe0), deadlineAndNonce)
 			mstore(add(ptr, 0x100), inputsHash)
 			mstore(add(ptr, 0x120), outputsHash)
 			result := keccak256(ptr, 0x140)
@@ -97,7 +97,7 @@ library TypedDataHashLib {
 			mstore(add(ptr, 0x40), subaccount)
 			mstore(add(ptr, 0x60), and(signer, ADDRESS_MASK))
 			mstore(add(ptr, 0x80), deadline)
-			result := keccak256(ptr, 0xA0)
+			result := keccak256(ptr, 0xa0)
 		}
 	}
 
@@ -116,22 +116,7 @@ library TypedDataHashLib {
 			mstore(add(ptr, 0x40), subaccount)
 			mstore(add(ptr, 0x60), and(signer, ADDRESS_MASK))
 			mstore(add(ptr, 0x80), deadline)
-			result := keccak256(ptr, 0xA0)
-		}
-	}
-
-	function hashSubaccount(
-		address holder,
-		address subaccount
-	) public pure returns (bytes32 result) {
-		bytes32 typeHash = SUBACCOUNT_TYPEHASH;
-
-		assembly ("memory-safe") {
-			let ptr := mload(0x40)
-			mstore(ptr, typeHash)
-			mstore(add(ptr, 0x20), and(holder, ADDRESS_MASK))
-			mstore(add(ptr, 0x40), and(subaccount, ADDRESS_MASK))
-			result := keccak256(ptr, 0x60)
+			result := keccak256(ptr, 0xa0)
 		}
 	}
 }

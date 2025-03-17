@@ -57,10 +57,3 @@ bytes32 constant REMOVE_SIGNER_TYPEHASH = keccak256(
 		"uint256 deadline"
 	")"
 );
-
-bytes32 constant SUBACCOUNT_TYPEHASH = keccak256(
-	"SubaccountDeclaration("
-		"address holder,"
-		"address subaccount"
-	")"
-);

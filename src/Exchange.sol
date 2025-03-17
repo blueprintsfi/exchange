@@ -22,7 +22,6 @@ function isValidSig(address signer, bytes32 hash, bytes calldata signature) retu
 }
 
 contract Exchange is BasicBlueprint, IExchange, EIP712 {
-
 	mapping (address holder =>
 		mapping (address operator =>
 			mapping (uint256 delay => UserData data))) public userData;
