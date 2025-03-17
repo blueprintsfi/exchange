@@ -81,8 +81,10 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
 		if (sender == holder)
 			return true;
-		if (subaccount != 0)
-			return signers[holder][subaccount][sender];
+		if (subaccount != 0) {
+			if (signers[holder][subaccount][sender])
+				return true;
+		}
 		return signers[holder][0][sender];
 	}
 
@@ -143,9 +145,9 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		bytes calldata signature
 	) external {
 		if (holder != to) {
-  			if (!hasAccess(msg.sender, holder, subaccount))
-    			revert Unauthorized();
-  		}
+			if (!hasAccess(msg.sender, holder, subaccount))
+				revert Unauthorized();
+		}
 
 		bytes32 withdrawalHash = TypedDataHashLib.hashWithdraw(
 			holder,

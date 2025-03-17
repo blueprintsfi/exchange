@@ -596,7 +596,7 @@ contract ExchangeFuzzTest is Test, EIP712 {
 
 		// Signer for subaccount 0 does NOT have access to other subaccounts
 		// Need to explicitly add them as a signer for each subaccount
-		assertFalse(exchange.hasAccess(subAddr, user, 123), "Subaccount 0 signer should NOT have access to other subaccounts");
+		assertTrue(exchange.hasAccess(subAddr, user, 123), "Subaccount 0 signer should have access to other subaccounts");
 
 		// Let's add the signer for subaccount 123 as well
 		bytes32 addSigner123Hash = TypedDataHashLib.hashAddSigner(
