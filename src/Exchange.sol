@@ -54,7 +54,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		(address depositFor, uint256 subaccount, address operator, uint256 delay, TokenOp[] memory deposits) =
 			abi.decode(action, (address, uint256, address, uint256, TokenOp[]));
 
-		mapping (uint256 tokenId => uint256 balance) storage balances =
+		mapping (uint256 => uint256) storage balances =
 			userData[depositFor][operator][delay].balances[subaccount];
 
 		uint256 len = deposits.length;
@@ -347,9 +347,9 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i].swap;
-			mapping (uint256 tokenId => uint256 balance) storage userBalances =
+			mapping (uint256 => uint256) storage userBalances =
 				userData[swap.holder][msg.sender][swap.delay].balances[swap.holderSubaccount];
-			mapping (uint256 tokenId => uint256 balance) storage toBalances =
+			mapping (uint256 => uint256) storage toBalances =
 				userData[swap.to][msg.sender][swap.delay].balances[swap.toSubaccount];
 
 			settleFlashOps(swap.inputs, userBalances, operatorState.balances[0]);
@@ -373,9 +373,9 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		}
 	}
 
-	// note: this function just returns the argument, check if this causes additional gas usage
+	// note: this function just returns the argument
 	function getSlot(
-		mapping (uint256 tokenId => uint256 balance) storage balances
+		mapping (uint256 => uint256) storage balances
 	) internal view returns (uint256 slot) {
 		assembly ("memory-safe") {
 			slot := balances.slot
@@ -384,7 +384,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 	function settleFlashOp(
 		uint256 id,
-		mapping (uint256 tokenId => uint256 balance) storage balances
+		mapping (uint256 => uint256) storage balances
 	) internal {
 		(uint256 positive, uint256 negative) =
 			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(balances)));
@@ -397,8 +397,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 	function settleFlashOps(
 		TokenOp[] calldata array,
-		mapping (uint256 tokenId => uint256 balance) storage balances0,
-		mapping (uint256 tokenId => uint256 balance) storage balances1
+		mapping (uint256 => uint256) storage balances0,
+		mapping (uint256 => uint256) storage balances1
 	) internal {
 		for (uint256 i = 0; i < array.length; i++) {
 			uint256 id = array[i].tokenId;
