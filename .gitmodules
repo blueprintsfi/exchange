@@ -4,6 +4,7 @@
 [submodule "lib/core"]
 	path = lib/core
 	url = https://github.com/blueprintsfi/core
+	branch = subaccounts
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/Vectorized/solady
