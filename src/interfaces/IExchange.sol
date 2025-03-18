@@ -21,7 +21,6 @@ struct SwapExecution {
 }
 
 struct UserData {
-	mapping (uint256 subaccount => mapping (uint256 tokenId => uint256 balance)) balances;
 	uint256 nonce;
 	uint256 ragequitTime;
 }

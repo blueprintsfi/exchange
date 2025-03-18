@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {gcd} from "core/libraries/Math.sol";
 import {HashLib} from "core/libraries/HashLib.sol";
-import {FlashAccountingLib as Flash} from "core/libraries/FlashAccountingLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
@@ -30,7 +29,6 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			mapping (address signer => bool isSigner))) public signers;
 	mapping (address signer => mapping (bytes32 hash => uint256 filled)) public fill;
 	mapping (address signer => mapping (bytes32 hash => uint256 timestamp)) public cancelled;
-	mapping (address subaccount => address account) public getMaster;
 
 	constructor(IBlueprintManager _blueprintManager)
 		BasicBlueprint(_blueprintManager)
@@ -54,26 +52,41 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		(address depositFor, uint256 subaccount, address operator, uint256 delay, TokenOp[] memory deposits) =
 			abi.decode(action, (address, uint256, address, uint256, TokenOp[]));
 
-		mapping (uint256 => uint256) storage balances =
-			userData[depositFor][operator][delay].balances[subaccount];
-
-		uint256 len = deposits.length;
-		for (uint256 i = 0; i < len; i++)
-			balances[deposits[i].tokenId] += deposits[i].amount;
+		blueprintManager.flashTransferFrom(
+			address(this),
+			0,
+			address(this),
+			getSubaccount(depositFor, subaccount, operator, delay),
+			deposits
+		);
 
 		emit Deposit(depositFor, operator, delay, deposits);
-
 		return (zero(), zero(), zero(), deposits);
+	}
+
+	function getSubaccount(
+		address holder,
+		uint256 exchangeSubaccount,
+		address operator,
+		uint256 delay
+	) public pure returns (uint256 subaccount) {
+		subaccount = HashLib.hash(holder, exchangeSubaccount);
+		subaccount = HashLib.hash(operator, subaccount);
+		subaccount = HashLib.hash(delay, subaccount);
 	}
 
 	function getBalance(
 		address holder,
-		uint256 subaccount,
+		uint256 exchangeSubaccount,
 		address operator,
 		uint256 delay,
 		uint256 tokenId
 	) external view returns (uint256 balance) {
-		balance = userData[holder][operator][delay].balances[subaccount][tokenId];
+		balance = blueprintManager.balanceOf(
+			address(this),
+			getSubaccount(holder, exchangeSubaccount, operator, delay),
+			tokenId
+		);
 	}
 
 	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
@@ -121,14 +134,13 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		if (ts + delay >= block.timestamp)
 			revert DelayNotPassed();
 
-		uint256 len = withdrawals.length;
-		for (uint256 i = 0; i < len; i++) {
-			uint256 tokenId = withdrawals[i].tokenId;
-			uint256 amount = withdrawals[i].amount;
-			userData[holder][operator][delay].balances[subaccount][tokenId] -= amount;
-		}
-
-		blueprintManager.transfer(to, withdrawals);
+		blueprintManager.transferFrom(
+			address(this),
+			getSubaccount(holder, subaccount, operator, delay),
+			to,
+			0,
+			withdrawals
+		);
 		emit RageWithdraw(holder, subaccount, to, operator, delay, withdrawals);
 	}
 
@@ -163,13 +175,13 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 		userData[holder][operator][delay].nonce = nonce;
 
-		uint256 len = withdrawals.length;
-		for (uint256 i = 0; i < len; i++) {
-			uint256 tokenId = withdrawals[i].tokenId;
-			uint256 amount = withdrawals[i].amount;
-			userData[holder][operator][delay].balances[subaccount][tokenId] -= amount;
-		}
-		blueprintManager.transfer(to, withdrawals);
+		blueprintManager.transferFrom(
+			address(this),
+			getSubaccount(holder, subaccount, operator, delay),
+			to,
+			0,
+			withdrawals
+		);
 		emit Withdraw(holder, subaccount, to, operator, delay, withdrawals);
 	}
 
@@ -289,14 +301,10 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	}
 
 	function executeSwaps(SwapExecution[] calldata swaps, bytes[] calldata signatures) external {
-		UserData storage operatorState = userData[msg.sender][msg.sender][0];
+		uint256 operatorSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
 		for (uint256 i = 0; i < swaps.length; i++) {
 			Swap calldata swap = swaps[i].swap;
-
 			address holder = swap.holder;
-
-			UserData storage userState = userData[swap.holder][msg.sender][swap.delay];
-			UserData storage toState = userData[swap.to][msg.sender][swap.delay];
 			// note: allow for swaps between balances with different delays
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
@@ -337,73 +345,25 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 				newFill
 			);
 
-			uint256 userSlot = getSlot(userState.balances[swap.holderSubaccount]);
-			uint256 toSlot = getSlot(toState.balances[swap.toSubaccount]);
-			uint256 operatorSlot = getSlot(operatorState.balances[0]);
+			uint256 fromSubaccount = getSubaccount(holder, swap.holderSubaccount, msg.sender, swap.delay);
+			uint256 toSubaccount = getSubaccount(swap.to, swap.toSubaccount, msg.sender, swap.delay);
 
-			addFlashOps(swap.inputs, operatorSlot, userSlot, inGcd, amountIn);
-			addFlashOps(swap.outputs, toSlot, operatorSlot, outGcd, amountIn);
-		}
-
-		for (uint256 i = 0; i < swaps.length; i++) {
-			Swap calldata swap = swaps[i].swap;
-			mapping (uint256 => uint256) storage userBalances =
-				userData[swap.holder][msg.sender][swap.delay].balances[swap.holderSubaccount];
-			mapping (uint256 => uint256) storage toBalances =
-				userData[swap.to][msg.sender][swap.delay].balances[swap.toSubaccount];
-
-			settleFlashOps(swap.inputs, userBalances, operatorState.balances[0]);
-			settleFlashOps(swap.outputs, toBalances, operatorState.balances[0]);
+			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, inGcd, amountIn);
+			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, outGcd, amountIn);
 		}
 	}
 
-	function addFlashOps(
+	function makeTransfers(
 		TokenOp[] calldata array,
-		uint256 add,
-		uint256 sub,
+		uint256 fromSubaccount,
+		uint256 toSubaccount,
 		uint256 gcd,
 		uint256 amountIn
 	) internal {
-		for (uint256 i = 0; i < array.length; i++) {
-			(uint256 tokenId, uint256 amount) = (array[i].tokenId, array[i].amount);
-			amount = amount / gcd * amountIn;
+		TokenOp[] memory amounts = array;
+		for (uint256 i = 0; i < array.length; i++)
+			amounts[i].amount = amounts[i].amount / gcd * amountIn;
 
-			Flash.addFlashValue(HashLib.hash(tokenId, add), amount);
-			Flash.subtractFlashValue(HashLib.hash(tokenId, sub), amount);
-		}
-	}
-
-	// note: this function just returns the argument
-	function getSlot(
-		mapping (uint256 => uint256) storage balances
-	) internal view returns (uint256 slot) {
-		assembly ("memory-safe") {
-			slot := balances.slot
-		}
-	}
-
-	function settleFlashOp(
-		uint256 id,
-		mapping (uint256 => uint256) storage balances
-	) internal {
-		(uint256 positive, uint256 negative) =
-			Flash.readAndNullifyFlashValue(HashLib.hash(id, getSlot(balances)));
-
-		if (positive != 0)
-			balances[id] += positive;
-		else if (negative != 0)
-			balances[id] -= negative;
-	}
-
-	function settleFlashOps(
-		TokenOp[] calldata array,
-		mapping (uint256 => uint256) storage balances0,
-		mapping (uint256 => uint256) storage balances1
-	) internal {
-		for (uint256 i = 0; i < array.length; i++) {
-			uint256 id = array[i].tokenId;
-			settleFlashOp(id, balances0);
-			settleFlashOp(id, balances1);
-		}
+		blueprintManager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
 	}
 }
