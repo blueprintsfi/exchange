@@ -13,6 +13,7 @@ bytes32 constant WITHDRAW_TYPEHASH = keccak256(
 		"address holder,"
 		"uint256 subaccount,"
 		"uint256 delay,"
+		"address operator,"
 		"uint256 nonce,"
 		"TokenOp[] withdrawals"
 	")"
@@ -26,10 +27,10 @@ bytes32 constant SWAP_TYPEHASH = keccak256(
 	"Swap("
 		"address holder,"
 		"uint256 holderSubaccount,"
-		"address to,"
-		"uint256 toSubaccount,"
 		"address operator,"
 		"uint256 delay,"
+		"address to,"
+		"uint256 toSubaccount,"
 		"uint256 deadlineAndNonce,"
 		"TokenOp[] inputs,"
 		"TokenOp[] outputs"
@@ -40,20 +41,12 @@ bytes32 constant SWAP_TYPEHASH = keccak256(
 	")"
 );
 
-bytes32 constant ADD_SIGNER_TYPEHASH = keccak256(
-	"AddSigner("
+bytes32 constant SET_SIGNER_TYPEHASH = keccak256(
+	"SetSigner("
 		"address holder,"
 		"uint256 subaccount,"
 		"address signer,"
-		"uint256 deadline"
-	")"
-);
-
-bytes32 constant REMOVE_SIGNER_TYPEHASH = keccak256(
-	"RemoveSigner("
-		"address holder,"
-		"uint256 subaccount,"
-		"address signer,"
-		"uint256 deadline"
+		"uint256 deadline,"
+		"bool isSigner"
 	")"
 );

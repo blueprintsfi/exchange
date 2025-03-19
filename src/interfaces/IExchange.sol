@@ -3,21 +3,39 @@ pragma solidity ^0.8.13;
 
 import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 
+// note: for eip-712 documentation only, not used in code
 struct Swap {
 	address holder;
 	uint256 holderSubaccount;
-	address to;
-	uint256 toSubaccount;
 	address operator;
 	uint256 delay;
+	address to;
+	uint256 toSubaccount;
 	uint256 deadlineAndNonce;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 }
 
+struct BalanceInfo {
+	address holder;
+	uint256 subaccount;
+	address operator;
+	uint256 delay;
+}
+
 struct SwapExecution {
-	Swap swap;
+	address holder;
+	uint256 holderSubaccount;
+	// address operator;
+	uint256 delay;
+	address to;
+	uint256 toSubaccount;
+	uint256 deadlineAndNonce;
+	TokenOp[] inputs;
+	TokenOp[] outputs;
 	uint256 output;
+	address signer;
+	bytes signature;
 }
 
 struct UserData {
@@ -31,6 +49,12 @@ interface IExchange  {
 	/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
 	error Unauthorized();
 
+	/// @notice Thrown when trying to remove a signer that isn't a signer (it may have been one)
+	error NotSigner();
+
+	/// @notice Thrown when trying to fill an order with a signature from a signer that lacks access
+	error InvalidSigner();
+
 	/// @notice Thrown when a ragequit is already set
 	error RagequitAlreadySet();
 
@@ -42,9 +66,6 @@ interface IExchange  {
 
 	/// @notice Thrown when trying to fill beyond the maximum amount
 	error ExceedsMaxFill();
-
-	/// @notice Thrown when trying to sign an already signed order
-	error OrderAlreadySigned();
 
 	/// @notice Thrown when trying to initialize cancellation for an order with already initialized cancellation
 	error OrderCancelAlreadyInitialized();
@@ -91,13 +112,11 @@ interface IExchange  {
 	/// @notice Emitted when a user initiates ragequit
 	/// @param holder The address initiating ragequit
 	/// @param operator The operator address
-	/// @param delay The delay period
 	/// @param sender The address that initiated the ragequit
 	/// @param timestamp When the ragequit was initiated
 	event Ragequit(
 		address indexed holder,
 		address indexed operator,
-		uint256 indexed delay,
 		address sender,
 		uint256 timestamp
 	);
@@ -105,47 +124,29 @@ interface IExchange  {
 	/// @notice Emitted when a user cancels their ragequit
 	/// @param holder The address canceling ragequit
 	/// @param operator The operator address
-	/// @param delay The delay period
 	/// @param sender The address that canceled the ragequit
 	event Unragequit(
 		address indexed holder,
 		address indexed operator,
-		uint256 indexed delay,
 		address sender
 	);
 
 	/// @notice Emitted when an order is signed
+	/// @param signer The account signing the orders
 	/// @param holder The address signing the order
-	/// @param orderId The unique identifier of the order
-	event OrderSigned(
+	/// @param orderIds Order ids that were signed
+	event OrdersSigned(
+		address indexed signer,
 		address indexed holder,
-		bytes32 indexed orderId
-	);
-
-	/// @notice Emitted when an order is marked for cancellation
-	/// @param holder The address that owns the order
-	/// @param orderId The unique identifier of the order
-	event InitCancel(
-		address indexed holder,
-		bytes32 indexed orderId
+		bytes32[] orderIds
 	);
 
 	/// @notice Emitted when an order is canceled
 	/// @param holder The address that owns the order
-	/// @param orderId The unique identifier of the order
-	event OrderCanceled(
+	/// @param orderIds Order ids that were canceled
+	event OrdersCanceled(
 		address indexed holder,
-		bytes32 indexed orderId
-	);
-
-	/// @notice Emitted when an order is canceled by the operator
-	/// @param holder The address that owns the order
-	/// @param orderId The unique identifier of the order
-	/// @param operator The operator that canceled the order
-	event OrderOperatorCanceled(
-		address indexed holder,
-		bytes32 indexed orderId,
-		address indexed operator
+		bytes32[] orderIds
 	);
 
 	/// @notice Emitted when an order is filled via swap
@@ -158,34 +159,15 @@ interface IExchange  {
 		uint256 fill
 	);
 
-
 	/// @notice Emitted when a withdrawal is performed
 	/// @param holder The address withdrawing funds
 	/// @param subaccount The subaccount identifier
-	/// @param to The recipient address
 	/// @param operator The operator address
 	/// @param delay The delay period
 	/// @param withdrawals Array of token operations being withdrawn
 	event Withdraw(
 		address indexed holder,
-		uint256 subaccount,
-		address indexed to,
-		address indexed operator,
-		uint256 delay,
-		TokenOp[] withdrawals
-	);
-
-	/// @notice Emitted when a rage withdrawal is performed
-	/// @param holder The address withdrawing funds
-	/// @param subaccount The subaccount identifier
-	/// @param to The recipient address
-	/// @param operator The operator address
-	/// @param delay The delay period
-	/// @param withdrawals Array of token operations being withdrawn
-	event RageWithdraw(
-		address indexed holder,
-		uint256 subaccount,
-		address indexed to,
+		uint256 indexed subaccount,
 		address indexed operator,
 		uint256 delay,
 		TokenOp[] withdrawals
@@ -195,19 +177,11 @@ interface IExchange  {
 	/// @param holder The address of the account holder
 	/// @param subaccount The subaccount identifier
 	/// @param signer The address being added as a signer
-	event AddSigner(
+	/// @param isSigner Whethet the signer was set or cancelled
+	event SignerSet(
 		address indexed holder,
 		uint256 indexed subaccount,
-		address indexed signer
-	);
-
-	/// @notice Emitted when a signer is removed from a subaccount
-	/// @param holder The address of the account holder
-	/// @param subaccount The subaccount identifier
-	/// @param signer The address being removed as a signer
-	event RemoveSigner(
-		address indexed holder,
-		uint256 indexed subaccount,
-		address indexed signer
+		address signer,
+		bool isSigner
 	);
 }
