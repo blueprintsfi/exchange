@@ -238,17 +238,25 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 				address signer = swap.signer;
 				if (!delayedHasAccess(signer, holder, swap.holderSubaccount, swap.delay))
 					revert InvalidSigner();
-				if (!isValidSig(signer, _hashTypedData(orderId), swaps[i].signature))
+				if (!isValidSig(signer, _hashTypedData(orderId), swap.signature))
 					revert InvalidSignature();
 			} else {
-				previousFill--;
+				unchecked {previousFill--;}
 			}
-			uint256 newFill = previousFill + swap.output; // todo: revert overflow no message
-			fill[fromSubaccount][orderId] = newFill + 1;
-			emit OrderSwapped(holder, orderId, newFill + 1);
+			uint256 denominator = swap.fillDenominator;
+			uint256 newFill;
+			unchecked {
+				newFill = previousFill + swap.output;
+				if (newFill < previousFill || newFill > denominator)
+					revert OrderOverfill();
+				if (denominator + 1 < 2) // revert if fillDenominator is 0 or type(uint).max
+					revert InvalidFillDenominator();
+				fill[fromSubaccount][orderId] = newFill + 1;
+			}
+			emit OrderSwapped(holder, orderId, newFill);
 
-			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, previousFill, newFill, swap.fillDenominator);
-			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, previousFill, newFill, swap.fillDenominator);
+			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, previousFill, newFill, denominator);
+			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, previousFill, newFill, denominator);
 		}
 	}
 
@@ -263,8 +271,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		for (uint256 i = 0; i < amounts.length; i++) {
 			uint256 amount = amounts[i].amount;
 			unchecked {
-				// revert if fill denominator is 0 or uint(-1), or would overflow when multiplied by amount
-				if (fillDenominator + 1 < 2 || fillDenominator * amount / fillDenominator != amount)
+				// revert if multiplication would overflow
+				if (fillDenominator * amount / fillDenominator != amount)
 					revert InvalidFillDenominator();
 				amounts[i].amount = amount * newFill / fillDenominator - amount * previousFill / fillDenominator;
 			}

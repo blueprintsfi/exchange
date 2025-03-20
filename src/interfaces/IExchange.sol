@@ -90,6 +90,9 @@ interface IExchange  {
 	/// @notice Thrown the fill denominator is too large or zero
 	error InvalidFillDenominator();
 
+	/// @notice Thrown when trying to fill the order over its capacity
+	error OrderOverfill();
+
 	/// @notice Thrown when signature verification fails
 	error InvalidSignature();
 
@@ -154,7 +157,7 @@ interface IExchange  {
 	/// @notice Emitted when an order is filled via swap
 	/// @param holder The address that owns the order
 	/// @param orderId The unique identifier of the order
-	/// @param fill The new fill amount
+	/// @param fill The new fill
 	event OrderSwapped(
 		address indexed holder,
 		bytes32 indexed orderId,
