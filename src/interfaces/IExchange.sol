@@ -12,6 +12,7 @@ struct Swap {
 	address to;
 	uint256 toSubaccount;
 	uint256 deadlineAndNonce;
+	uint256 fillDenominator;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 }
@@ -31,6 +32,7 @@ struct SwapExecution {
 	address to;
 	uint256 toSubaccount;
 	uint256 deadlineAndNonce;
+	uint256 fillDenominator;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 	uint256 output;
@@ -85,8 +87,8 @@ interface IExchange  {
 	/// @notice Thrown when trying to execute a swap with wrong operator
 	error WrongOperator();
 
-	/// @notice Thrown when trying to fill beyond output GCD
-	error ExceedsOutputGcd();
+	/// @notice Thrown the fill denominator is too large or zero
+	error InvalidFillDenominator();
 
 	/// @notice Thrown when signature verification fails
 	error InvalidSignature();

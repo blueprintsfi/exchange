@@ -68,11 +68,13 @@ library TypedDataHashLib {
 			mstore(add(ptr, 0x60), and(operator, ADDRESS_MASK))
 			mstore(add(ptr, 0x80), calldataload(add(swap, 0x40))) // delay
 			mstore(add(ptr, 0xa0), and(calldataload(add(swap, 0x60)), ADDRESS_MASK)) // to
-			mstore(add(ptr, 0xc0), calldataload(add(swap, 0x80))) // toSubaccount
-			mstore(add(ptr, 0xe0), calldataload(add(swap, 0xa0))) // deadlineAndNonce
-			mstore(add(ptr, 0x100), inputsHash)
-			mstore(add(ptr, 0x120), outputsHash)
-			result := keccak256(ptr, 0x140)
+			// mstore(add(ptr, 0xc0), calldataload(add(swap, 0x80))) // toSubaccount
+			// mstore(add(ptr, 0xe0), calldataload(add(swap, 0xa0))) // deadlineAndNonce
+			// mstore(add(ptr, 0x100), calldataload(add(swap, 0xc0))) // fillDenominator
+			calldatacopy(add(ptr, 0xc0), add(swap, 0x80), 0x60)
+			mstore(add(ptr, 0x120), inputsHash)
+			mstore(add(ptr, 0x140), outputsHash)
+			result := keccak256(ptr, 0x160)
 		}
 	}
 

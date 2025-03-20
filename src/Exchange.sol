@@ -10,12 +10,6 @@ import {IExchange, UserData, SwapExecution, BalanceInfo} from "src/interfaces/IE
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
-function gcd(TokenOp[] calldata ops) pure returns (uint256 res) {
-	res = 0;
-	for (uint256 i = 0; i < ops.length; i++)
-		res = gcd(res, ops[i].amount);
-}
-
 function isValidSig(address signer, bytes32 hash, bytes calldata signature) view returns (bool) {
 	return SignatureCheckerLib.isValidSignatureNowCalldata(signer, hash, signature);
 }
@@ -227,33 +221,13 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		emit SignerSet(holder, subaccount, signer, isSigner);
 	}
 
-	function getSwapData(
-		SwapExecution calldata swap,
-		uint256 previousFill,
-		uint256 newFill
-	) internal pure returns (
-		uint256 amountInGcd,
-		uint256 amountOutGcd,
-		uint256 amountIn
-	) {
-		amountInGcd = gcd(swap.inputs);
-		amountOutGcd = gcd(swap.outputs);
-
-		if (newFill >= amountOutGcd)
-			revert ExceedsOutputGcd();
-
-		uint256 previousInput = amountInGcd * previousFill / amountOutGcd;
-		uint256 newInput = amountInGcd * newFill / amountOutGcd;
-
-		amountIn = newInput - previousInput;
-	}
-
 	function executeSwaps(SwapExecution[] calldata swaps) external {
 		uint256 operatorSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
 		for (uint256 i = 0; i < swaps.length; i++) {
 			SwapExecution calldata swap = swaps[i];
 			address holder = swap.holder;
 			uint256 fromSubaccount = getSubaccount(holder, swap.holderSubaccount, msg.sender, swap.delay);
+			uint256 toSubaccount = getSubaccount(swap.to, swap.toSubaccount, msg.sender, swap.delay);
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
@@ -269,33 +243,32 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			} else {
 				previousFill--;
 			}
-			uint256 newFill = previousFill + swaps[i].output; // todo: revert overflow no message
+			uint256 newFill = previousFill + swap.output; // todo: revert overflow no message
 			fill[fromSubaccount][orderId] = newFill + 1;
 			emit OrderSwapped(holder, orderId, newFill + 1);
 
-			(uint256 inGcd, uint256 outGcd, uint256 amountIn) = getSwapData(
-				swap,
-				previousFill,
-				newFill
-			);
-
-			uint256 toSubaccount = getSubaccount(swap.to, swap.toSubaccount, msg.sender, swap.delay);
-
-			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, inGcd, amountIn);
-			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, outGcd, amountIn);
+			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, previousFill, newFill, swap.fillDenominator);
+			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, previousFill, newFill, swap.fillDenominator);
 		}
 	}
 
 	function makeTransfers(
-		TokenOp[] calldata array,
+		TokenOp[] memory amounts,
 		uint256 fromSubaccount,
 		uint256 toSubaccount,
-		uint256 gcd,
-		uint256 amountIn
+		uint256 previousFill,
+		uint256 newFill,
+		uint256 fillDenominator
 	) internal {
-		TokenOp[] memory amounts = array;
-		for (uint256 i = 0; i < array.length; i++)
-			amounts[i].amount = amounts[i].amount / gcd * amountIn;
+		for (uint256 i = 0; i < amounts.length; i++) {
+			uint256 amount = amounts[i].amount;
+			unchecked {
+				// revert if fill denominator is 0 or uint(-1), or would overflow when multiplied by amount
+				if (fillDenominator + 1 < 2 || fillDenominator * amount / fillDenominator != amount)
+					revert InvalidFillDenominator();
+				amounts[i].amount = amount * newFill / fillDenominator - amount * previousFill / fillDenominator;
+			}
+		}
 
 		blueprintManager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
 	}

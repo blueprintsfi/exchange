@@ -32,6 +32,7 @@ bytes32 constant SWAP_TYPEHASH = keccak256(
 		"address to,"
 		"uint256 toSubaccount,"
 		"uint256 deadlineAndNonce,"
+		"uint256 fillDenominator,"
 		"TokenOp[] inputs,"
 		"TokenOp[] outputs"
 	")"
