@@ -40,6 +40,11 @@ struct SwapExecution {
 	bytes signature;
 }
 
+struct OperatorTransfer {
+	uint256 toSubaccount;
+	TokenOp[] amounts;
+}
+
 struct UserData {
 	uint256 nonce;
 	uint256 ragequitTime;

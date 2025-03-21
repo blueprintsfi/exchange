@@ -5,7 +5,7 @@ import {HashLib} from "core/libraries/HashLib.sol";
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
-import {IExchange, UserData, SwapExecution, BalanceInfo} from "src/interfaces/IExchange.sol";
+import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
@@ -278,5 +278,18 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		}
 
 		blueprintManager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
+	}
+
+	function operatorFlashTransfer(OperatorTransfer[] calldata transfers) external {
+		uint256 operatorSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
+		for (uint256 i = 0; i < transfers.length; i++) {
+			blueprintManager.flashTransferFrom(
+				address(this),
+				operatorSubaccount,
+				address(this),
+				transfers[i].toSubaccount,
+				transfers[i].amounts
+			);
+		}
 	}
 }
