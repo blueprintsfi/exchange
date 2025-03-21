@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {HashLib} from "core/libraries/HashLib.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
-import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
+import {hashWithdrawal, hashSwap, hashSetSigner} from "./libraries/ExchangeHashing.sol";
 import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "src/interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
@@ -113,7 +113,7 @@ contract Exchange is IExchange, EIP712 {
 		bytes calldata signature
 	) external {
 		if (!authorizedDelay(info)) {
-			bytes32 withdrawalHash = TypedDataHashLib.hashWithdraw(info, nonce, withdrawals);
+			bytes32 withdrawalHash = hashWithdrawal(info, nonce, withdrawals);
 			if (!isValidSig(info.operator, _hashTypedData(withdrawalHash), signature))
 				revert InvalidSignature();
 		}
@@ -162,15 +162,8 @@ contract Exchange is IExchange, EIP712 {
 			if (block.timestamp > deadline)
 				revert DeadlinePassed();
 
-			bytes32 subaccountHash = TypedDataHashLib.hashSetSigner(
-				holder,
-				subaccount,
-				signer,
-				deadline,
-				isSigner
-			);
-
-			if (!isValidSig(holder, _hashTypedData(subaccountHash), signature))
+			bytes32 setSignerHash = hashSetSigner(holder, subaccount, signer, deadline, isSigner);
+			if (!isValidSig(holder, _hashTypedData(setSignerHash), signature))
 				revert InvalidSignature();
 		}
 
@@ -196,7 +189,7 @@ contract Exchange is IExchange, EIP712 {
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
 
-			bytes32 orderId = TypedDataHashLib.hashSwap(msg.sender, swap);
+			bytes32 orderId = hashSwap(msg.sender, swap);
 			uint256 previousFill = fill[fromSubaccount][orderId];
 			if (previousFill == 0) {
 				address signer = swap.signer;

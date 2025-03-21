@@ -4,8 +4,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import "../src/Exchange.sol";
-import "../src/libraries/TypeHashes.sol";
-import "../src/libraries/TypedDataHashLib.sol";
+import "../src/libraries/ExchangeHashing.sol";
 
 import "solady/utils/EIP712.sol";
 import "solady/utils/SignatureCheckerLib.sol";
