@@ -8,17 +8,11 @@ import {Exchange} from "./Exchange.sol";
 contract SimpleOperator is BasicBlueprint {
 	address immutable controller;
 
-	constructor(
-		IBlueprintManager _blueprintManager,
-		address _controller
-	) BasicBlueprint(_blueprintManager) {
+	constructor(IBlueprintManager manager, address _controller) BasicBlueprint(manager) {
 		controller = _controller;
 	}
 
-	function executeCalls(
-		address realizer,
-		BlueprintCall[] calldata calls
-	) external {
+	function executeCalls(address realizer, BlueprintCall[] calldata calls) external {
 		require(msg.sender == controller);
 		for (uint256 i = 0; i < calls.length; i++) {
 			if (calls[i].blueprint != address(this))
@@ -41,19 +35,17 @@ contract SimpleOperator is BasicBlueprint {
 		TokenOp[] memory /*give*/,
 		TokenOp[] memory /*take*/
 	) {
-		bytes32 opHash;
 		bool allowed;
 		assembly ("memory-safe") {
 			let ptr := mload(0x40)
 			calldatacopy(ptr, action.offset, action.length)
-			opHash := keccak256(ptr, action.length)
+			let opHash := keccak256(ptr, action.length)
 			allowed := tload(opHash)
 			tstore(opHash, 0)
 		}
 		require(allowed);
 
-		(address toCall, bytes memory data) = abi.decode(action, (address, bytes));
-		(bool success,) = toCall.call(data);
+		(bool success,) = address(bytes20(action)).call(action[20:]);
 		require(success);
 		return (zero(), zero(), zero(), zero());
 	}
