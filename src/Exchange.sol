@@ -67,16 +67,16 @@ contract Exchange is IExchange, EIP712 {
 		if (signer == holder)
 			return true;
 		if (subaccount != 0) {
-			uint256 signerInfo = signers[holder][subaccount][signer];
-			if (signerInfo == 1)
+			uint256 _signerInfo = signers[holder][subaccount][signer];
+			if (_signerInfo == 1)
 				return true;
-			if (signerInfo != 0 && signerInfo + delay < block.timestamp)
+			if (_signerInfo != 0 && _signerInfo + delay > block.timestamp)
 				return true;
 		}
-		uint256 signerInfo = signers[holder][subaccount][signer];
+		uint256 signerInfo = signers[holder][0][signer];
 		if (signerInfo == 1)
 			return true;
-		return signerInfo != 0 && signerInfo + delay < block.timestamp;
+		return signerInfo != 0 && signerInfo + delay > block.timestamp;
 	}
 
 	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
