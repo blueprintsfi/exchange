@@ -56,7 +56,7 @@ bytes32 constant SET_SIGNER_TYPEHASH = keccak256(
 
 uint256 constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
 
-function hashTokenOps(TokenOp[] calldata ops) public pure returns (bytes32 result) {
+function hashTokenOps(TokenOp[] calldata ops) pure returns (bytes32 result) {
 	bytes32 typehash = TOKENOP_TYPEHASH;
 
 	assembly ("memory-safe") {
@@ -81,7 +81,7 @@ function hashWithdrawal(
 	BalanceInfo calldata info,
 	uint256 nonce,
 	TokenOp[] calldata withdrawals
-) public pure returns (bytes32 result) {
+) pure returns (bytes32 result) {
 	bytes32 withdrawalsHash = hashTokenOps(withdrawals);
 	bytes32 typehash = WITHDRAW_TYPEHASH;
 
@@ -99,10 +99,7 @@ function hashWithdrawal(
 	}
 }
 
-function hashSwap(
-	address operator,
-	SwapExecution calldata swap
-) public pure returns (bytes32 result) {
+function hashSwap(address operator, SwapExecution calldata swap) pure returns (bytes32 result) {
 	bytes32 inputsHash = hashTokenOps(swap.inputs);
 	bytes32 outputsHash = hashTokenOps(swap.outputs);
 	bytes32 typehash = SWAP_TYPEHASH;
@@ -131,7 +128,7 @@ function hashSetSigner(
 	address signer,
 	uint256 deadline,
 	bool isSigner
-) public pure returns (bytes32 result) {
+) pure returns (bytes32 result) {
 	bytes32 typehash = SET_SIGNER_TYPEHASH;
 
 	assembly ("memory-safe") {
