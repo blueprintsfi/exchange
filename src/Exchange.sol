@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {HashLib} from "core/libraries/HashLib.sol";
-import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {TypedDataHashLib} from "./libraries/TypedDataHashLib.sol";
 import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "src/interfaces/IExchange.sol";
@@ -13,16 +12,17 @@ function isValidSig(address signer, bytes32 hash, bytes calldata signature) view
 	return SignatureCheckerLib.isValidSignatureNowCalldata(signer, hash, signature);
 }
 
-contract Exchange is BasicBlueprint, IExchange, EIP712 {
+contract Exchange is IExchange, EIP712 {
+	IBlueprintManager public immutable manager;
 	mapping (address holder => mapping (address operator => UserData data)) public userData;
 	mapping (address holder =>
 		mapping (uint256 subaccount =>
 			mapping (address signer => uint256 signerInfo))) public signers;
 	mapping (uint256 managerSubaccount => mapping (bytes32 hash => uint256 filled)) public fill;
 
-	constructor(IBlueprintManager _blueprintManager)
-		BasicBlueprint(_blueprintManager)
-		EIP712() {}
+	constructor(IBlueprintManager _manager) EIP712() {
+		manager = _manager;
+	}
 
 	function _domainNameAndVersion() internal pure override returns (
 		string memory name,
@@ -30,28 +30,6 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 	) {
 		name = "Exchange";
 		version = "1";
-	}
-
-	// deposit using cook
-	function executeAction(bytes calldata action) external onlyManager returns (
-		TokenOp[] memory /*mint*/,
-		TokenOp[] memory /*burn*/,
-		TokenOp[] memory /*give*/,
-		TokenOp[] memory /*take*/
-	) {
-		(address depositFor, uint256 subaccount, address operator, uint256 delay, TokenOp[] memory deposits) =
-			abi.decode(action, (address, uint256, address, uint256, TokenOp[]));
-
-		blueprintManager.flashTransferFrom(
-			address(this),
-			0,
-			address(this),
-			getSubaccount(depositFor, subaccount, operator, delay),
-			deposits
-		);
-
-		emit Deposit(depositFor, operator, delay, deposits);
-		return (zero(), zero(), zero(), deposits);
 	}
 
 	function getSubaccount(
@@ -76,11 +54,8 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		uint256 delay,
 		uint256 tokenId
 	) external view returns (uint256 balance) {
-		balance = blueprintManager.balanceOf(
-			address(this),
-			getSubaccount(holder, exchangeSubaccount, operator, delay),
-			tokenId
-		);
+		uint256 subaccount = getSubaccount(holder, exchangeSubaccount, operator, delay);
+		balance = manager.balanceOf(address(this), subaccount, tokenId);
 	}
 
 	function delayedHasAccess(
@@ -118,7 +93,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 		if (msg.sender == info.operator)
 			return true;
 		if (!hasAccess(msg.sender, info.holder, info.subaccount))
-			revert AccessDenied();
+			revert Unauthorized();
 		uint256 ts = userData[info.holder][info.operator].ragequitTime;
 		return ts != 0 && ts + info.delay <= block.timestamp;
 	}
@@ -158,7 +133,7 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 
 		userData[info.holder][info.operator].nonce = nonce;
 
-		blueprintManager.transferFrom(address(this), getSubaccount(info), info.holder, 0, withdrawals);
+		manager.transferFrom(address(this), getSubaccount(info), info.holder, 0, withdrawals);
 		emit Withdraw(info.holder, info.subaccount, info.operator, info.delay, withdrawals);
 	}
 
@@ -277,19 +252,15 @@ contract Exchange is BasicBlueprint, IExchange, EIP712 {
 			}
 		}
 
-		blueprintManager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
+		manager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
 	}
 
 	function operatorFlashTransfer(OperatorTransfer[] calldata transfers) external {
-		uint256 operatorSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
+		uint256 operator = getSubaccount(msg.sender, 0, msg.sender, 0);
 		for (uint256 i = 0; i < transfers.length; i++) {
-			blueprintManager.flashTransferFrom(
-				address(this),
-				operatorSubaccount,
-				address(this),
-				transfers[i].toSubaccount,
-				transfers[i].amounts
-			);
+			uint256 to = transfers[i].toSubaccount;
+			TokenOp[] calldata ops = transfers[i].amounts;
+			manager.flashTransferFrom(address(this), operator, address(this), to, ops);
 		}
 	}
 }
