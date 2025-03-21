@@ -16,22 +16,25 @@ contract SimpleOperator is BasicBlueprint {
 	}
 
 	function executeCalls(
-		bytes32[] calldata opHashes,
 		address realizer,
 		BlueprintCall[] calldata calls
 	) external {
 		require(msg.sender == controller);
-		for (uint256 i = 0; i < opHashes.length; i++) {
-			bytes32 opHash = opHashes[i];
-			assembly {
-				tstore(opHash, 1)
+		for (uint256 i = 0; i < calls.length; i++) {
+			if (calls[i].blueprint != address(this))
+				continue;
+
+			bytes calldata action = calls[i].action;
+			assembly ("memory-safe") {
+				let ptr := mload(0x40)
+				calldatacopy(ptr, action.offset, action.length)
+				tstore(keccak256(ptr, action.length), 1)
 			}
 		}
 
 		blueprintManager.cook(realizer, calls);
 	}
 
-	// deposit using cook
 	function executeAction(bytes calldata action) external onlyManager returns (
 		TokenOp[] memory /*mint*/,
 		TokenOp[] memory /*burn*/,
@@ -40,7 +43,7 @@ contract SimpleOperator is BasicBlueprint {
 	) {
 		bytes32 opHash;
 		bool allowed;
-		assembly {
+		assembly ("memory-safe") {
 			let ptr := mload(0x40)
 			calldatacopy(ptr, action.offset, action.length)
 			opHash := keccak256(ptr, action.length)
