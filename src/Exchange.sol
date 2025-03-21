@@ -58,48 +58,38 @@ contract Exchange is IExchange, EIP712 {
 		balance = manager.balanceOf(address(this), subaccount, tokenId);
 	}
 
-	function delayedHasAccess(
-		address signer,
+	function hasAccess(
+		address signerOrSender,
 		address holder,
 		uint256 subaccount,
 		uint256 delay
 	) public view returns (bool) {
-		if (signer == holder)
+		if (signerOrSender == holder)
 			return true;
 		if (subaccount != 0) {
-			uint256 _signerInfo = signers[holder][subaccount][signer];
+			uint256 _signerInfo = signers[holder][subaccount][signerOrSender];
 			if (_signerInfo == 1)
 				return true;
 			if (_signerInfo != 0 && _signerInfo + delay > block.timestamp)
 				return true;
 		}
-		uint256 signerInfo = signers[holder][0][signer];
+		uint256 signerInfo = signers[holder][0][signerOrSender];
 		if (signerInfo == 1)
 			return true;
 		return signerInfo != 0 && signerInfo + delay > block.timestamp;
 	}
 
-	function hasAccess(address sender, address holder, uint256 subaccount) public view returns (bool) {
-		if (sender == holder)
-			return true;
-		if (subaccount != 0) {
-			if (signers[holder][subaccount][sender] == 1)
-				return true;
-		}
-		return signers[holder][0][sender] == 1;
-	}
-
 	function authorizedDelay(BalanceInfo calldata info) internal view returns (bool) {
 		if (msg.sender == info.operator)
 			return true;
-		if (!hasAccess(msg.sender, info.holder, info.subaccount))
+		if (!hasAccess(msg.sender, info.holder, info.subaccount, 0))
 			revert Unauthorized();
 		uint256 ts = userData[info.holder][info.operator].ragequitTime;
 		return ts != 0 && ts + info.delay <= block.timestamp;
 	}
 
 	function ragequit(address holder, address operator) external {
-		if (!hasAccess(msg.sender, holder, 0))
+		if (!hasAccess(msg.sender, holder, 0, 0))
 			revert Unauthorized();
 		if (userData[holder][operator].ragequitTime != 0)
 			revert RagequitAlreadySet();
@@ -108,7 +98,7 @@ contract Exchange is IExchange, EIP712 {
 	}
 
 	function unragequit(address holder, address operator) external {
-		if (!hasAccess(msg.sender, holder, 0))
+		if (!hasAccess(msg.sender, holder, 0, 0))
 			revert Unauthorized();
 		if (userData[holder][operator].ragequitTime == 0)
 			revert NoRagequitSet();
@@ -148,7 +138,7 @@ contract Exchange is IExchange, EIP712 {
 	}
 
 	function signOrders(BalanceInfo calldata info, bytes32[] calldata orderIds) external {
-		if (!hasAccess(msg.sender, info.holder, info.subaccount))
+		if (!hasAccess(msg.sender, info.holder, info.subaccount, 0))
 			revert Unauthorized();
 
 		uint256 managerSubaccount = getSubaccount(info);
@@ -168,7 +158,7 @@ contract Exchange is IExchange, EIP712 {
 		bool isSigner,
 		bytes calldata signature
 	) external {
-		if (!hasAccess(msg.sender, holder, 0)) {
+		if (!hasAccess(msg.sender, holder, 0, 0)) {
 			if (block.timestamp > deadline)
 				revert DeadlinePassed();
 
@@ -210,7 +200,7 @@ contract Exchange is IExchange, EIP712 {
 			uint256 previousFill = fill[fromSubaccount][orderId];
 			if (previousFill == 0) {
 				address signer = swap.signer;
-				if (!delayedHasAccess(signer, holder, swap.holderSubaccount, swap.delay))
+				if (!hasAccess(signer, holder, swap.holderSubaccount, swap.delay))
 					revert InvalidSigner();
 				if (!isValidSig(signer, _hashTypedData(orderId), swap.signature))
 					revert InvalidSignature();
