@@ -83,7 +83,7 @@ contract Exchange is IExchange, EIP712 {
 		if (msg.sender == info.operator)
 			return true;
 		if (!hasAccess(msg.sender, info.holder, info.subaccount, 0))
-			revert Unauthorized();
+			return false;
 		uint256 ts = userData[info.holder][info.operator].ragequitTime;
 		return ts != 0 && ts + info.delay <= block.timestamp;
 	}
