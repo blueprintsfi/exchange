@@ -212,30 +212,40 @@ contract Exchange is IExchange, EIP712 {
 			}
 			emit OrderSwapped(holder, orderId, newFill);
 
-			makeTransfers(swap.inputs, fromSubaccount, operatorSubaccount, previousFill, newFill, denominator);
-			makeTransfers(swap.outputs, operatorSubaccount, toSubaccount, previousFill, newFill, denominator);
-		}
-	}
-
-	function makeTransfers(
-		TokenOp[] memory amounts,
-		uint256 fromSubaccount,
-		uint256 toSubaccount,
-		uint256 previousFill,
-		uint256 newFill,
-		uint256 fillDenominator
-	) internal {
-		for (uint256 i = 0; i < amounts.length; i++) {
-			uint256 amount = amounts[i].amount;
-			unchecked {
-				// revert if multiplication would overflow
-				if (fillDenominator * amount / fillDenominator != amount)
-					revert InvalidFillDenominator();
-				amounts[i].amount = amount * newFill / fillDenominator - amount * previousFill / fillDenominator;
+			TokenOp[] memory inputs = new TokenOp[](swap.inputs.length);
+			for (uint256 j = 0; j < inputs.length; j++) {
+				uint256 amount = swap.inputs[j].amount;
+				unchecked {
+					// revert if multiplication would overflow
+					if (denominator * amount / denominator != amount)
+						revert InvalidFillDenominator();
+					inputs[j] = TokenOp({
+						tokenId: swap.inputs[j].tokenId,
+						amount: amount * newFill / denominator - amount * previousFill / denominator
+					});
+				}
 			}
-		}
+			manager.flashTransferFrom(address(this), fromSubaccount, address(this), operatorSubaccount, inputs);
 
-		manager.flashTransferFrom(address(this), fromSubaccount, address(this), toSubaccount, amounts);
+			TokenOp[] memory outputs = new TokenOp[](swap.outputs.length);
+			// negate fills to easily round up - they are now amounts remaining
+			newFill = denominator - newFill;
+			previousFill = denominator - previousFill;
+			for (uint256 j = 0; j < outputs.length; j++) {
+				uint256 amount = swap.outputs[j].amount;
+				unchecked {
+					// revert if multiplication would overflow
+					if (denominator * amount / denominator != amount)
+						revert InvalidFillDenominator();
+					outputs[j] = TokenOp({
+						tokenId: swap.outputs[j].tokenId,
+						// amount remaining before minus amount remaining after swap
+						amount: amount * previousFill / denominator - amount * newFill / denominator
+					});
+				}
+			}
+			manager.flashTransferFrom(address(this), operatorSubaccount, address(this), toSubaccount, outputs);
+		}
 	}
 
 	function operatorFlashTransfer(OperatorTransfer[] calldata transfers) external {
