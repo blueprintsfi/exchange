@@ -14,8 +14,8 @@ bytes32 constant WITHDRAW_TYPEHASH = keccak256(
 	"Withdraw("
 		"address holder,"
 		"uint256 subaccount,"
-		"uint256 delay,"
 		"address operator,"
+		"uint256 delay,"
 		"uint256 nonce,"
 		"TokenOp[] withdrawals"
 	")"
@@ -89,10 +89,9 @@ function hashWithdrawal(
 		let ptr := mload(0x40)
 		mstore(ptr, typehash)
 		mstore(add(ptr, 0x20), and(calldataload(info), ADDRESS_MASK))
-		// mstore(add(ptr, 0x40), calldataload(add(info, 0x20)))
-		// mstore(add(ptr, 0x60), calldataload(add(info, 0x40)))
-		calldatacopy(add(ptr, 0x40), add(info, 0x20), 0x40)
-		mstore(add(ptr, 0x80), and(calldataload(add(info, 0x60)), ADDRESS_MASK))
+		mstore(add(ptr, 0x40), calldataload(add(info, 0x20)))
+		mstore(add(ptr, 0x60), and(calldataload(add(info, 0x40)), ADDRESS_MASK))
+		mstore(add(ptr, 0x80), calldataload(add(info, 0x60)))
 		mstore(add(ptr, 0xa0), nonce)
 		mstore(add(ptr, 0xc0), withdrawalsHash)
 		result := keccak256(ptr, 0xe0)
