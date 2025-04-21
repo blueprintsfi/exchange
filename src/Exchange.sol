@@ -184,7 +184,6 @@ contract Exchange is IExchange, EIP712 {
 			SwapExecution calldata swap = swaps[i];
 			address holder = swap.holder;
 			uint256 fromSubaccount = getSubaccount(holder, swap.holderSubaccount, msg.sender, swap.delay);
-			uint256 toSubaccount = getSubaccount(swap.to, swap.toSubaccount, msg.sender, swap.delay);
 
 			if (block.timestamp > (swap.deadlineAndNonce >> 128))
 				revert OrderExpired();
@@ -244,7 +243,7 @@ contract Exchange is IExchange, EIP712 {
 					});
 				}
 			}
-			manager.flashTransferFrom(address(this), operatorSubaccount, address(this), toSubaccount, outputs);
+			manager.flashTransferFrom(address(this), operatorSubaccount, swap.to, swap.toSubaccount, outputs);
 		}
 	}
 
