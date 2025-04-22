@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {HashLib} from "core/libraries/HashLib.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {hashWithdrawal, hashSwap, hashSetSigner} from "./libraries/ExchangeHashing.sol";
-import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "src/interfaces/IExchange.sol";
+import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "./interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
