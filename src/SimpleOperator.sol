@@ -30,6 +30,7 @@ contract SimpleOperator is BasicBlueprint {
 	}
 
 	function executeAction(bytes calldata action) external onlyManager returns (
+		uint256,
 		TokenOp[] memory /*mint*/,
 		TokenOp[] memory /*burn*/,
 		TokenOp[] memory /*give*/,
@@ -47,6 +48,6 @@ contract SimpleOperator is BasicBlueprint {
 
 		(bool success,) = address(bytes20(action)).call(action[20:]);
 		require(success);
-		return (zero(), zero(), zero(), zero());
+		return (0, zero(), zero(), zero(), zero());
 	}
 }
