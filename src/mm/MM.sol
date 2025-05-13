@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
-import {IMarketMakerImplementation} from "../interfaces/IMarketMakerImplementation.sol";
 
 contract MM is BasicBlueprint {
 	uint256 public ragequitTimestamp;
@@ -11,7 +10,7 @@ contract MM is BasicBlueprint {
 	address immutable public holder;
 	address immutable public operator;
 	uint256 immutable public delay;
-	IMarketMakerImplementation immutable public implementation;
+	address immutable public implementation;
 
 	event Ragequit(uint256 timestamp, bool status);
 
@@ -25,7 +24,7 @@ contract MM is BasicBlueprint {
 		holder = _holder;
 		operator = _operator;
 		delay = _delay;
-		implementation = IMarketMakerImplementation(_implementation);
+		implementation = _implementation;
 	}
 
 	function executeAction(bytes calldata action) external onlyManager returns (
@@ -43,10 +42,38 @@ contract MM is BasicBlueprint {
 		if (remaining == 0)
 			revert AccessDenied();
 
-		(uint256 subaccount, TokenOp[] memory give, TokenOp[] memory take) =
-			implementation.executeAction(action);
+		(bool success,) = implementation.delegatecall(action);
+		require(success);
 
-		return (subaccount, zero(), zero(), give, take);
+		// returndata:
+		// 0: subaccount
+		// 1: mint pointer (to 0xa0)
+		// 2: burn pointer (to 0xa0)
+		// 3: give pointer
+		// 4: take pointer
+		// 5: zero slot
+		// 6...: give length and contents
+		// later...: take length and contents
+		assembly {
+			calldatacopy(0, 0, 0x60)
+			let arr := mload(0x20)
+			calldatacopy(0x20, arr, 0x20)
+			let arrLength := mload(0x20)
+			let giveByteLength := add(0x20, shl(6, arrLength))
+			calldatacopy(0xc0, arr, giveByteLength)
+			arr := mload(0x40)
+			calldatacopy(0x20, arr, 0x20)
+			arrLength := mload(0x20)
+			let takeByteLength := add(0x20, shl(6, arrLength))
+			let ptr := add(0xc0, giveByteLength)
+			calldatacopy(ptr, arr, takeByteLength)
+			mstore(0x20, 0xa0)
+			mstore(0x40, 0xa0)
+			mstore(0x60, 0xc0)
+			mstore(0x80, ptr)
+			mstore(0xa0, 0)
+			return(0, add(ptr, takeByteLength))
+		}
 	}
 
 	function ragequit(bool status) external {
