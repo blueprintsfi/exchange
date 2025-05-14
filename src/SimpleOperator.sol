@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
+import {BasicBlueprint, zero} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp, BlueprintCall} from "core/interfaces/IBlueprintManager.sol";
 import {Exchange} from "./Exchange.sol";
 
 contract SimpleOperator is BasicBlueprint {
 	address immutable controller;
 
-	constructor(IBlueprintManager manager, address _controller) BasicBlueprint(manager) {
+	constructor(IBlueprintManager _manager, address _controller) BasicBlueprint(_manager) {
 		controller = _controller;
 	}
 
@@ -26,7 +26,7 @@ contract SimpleOperator is BasicBlueprint {
 			}
 		}
 
-		blueprintManager.cook(realizer, calls);
+		manager.cook(realizer, calls);
 	}
 
 	function executeAction(bytes calldata action) external onlyManager returns (

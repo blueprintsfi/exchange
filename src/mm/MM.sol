@@ -13,12 +13,12 @@ contract MM is BasicBlueprint {
 	IMMFactory immutable public factory;
 
 	constructor(
-		IBlueprintManager manager,
+		IBlueprintManager _manager,
 		address _holder,
 		address _operator,
 		uint256 _delay,
 		address _implementation
-	) BasicBlueprint(manager) {
+	) BasicBlueprint(_manager) {
 		holder = _holder;
 		operator = _operator;
 		delay = _delay;
@@ -54,18 +54,18 @@ contract MM is BasicBlueprint {
 		// 6...: give length and contents
 		// later...: take length and contents
 		assembly {
-			calldatacopy(0, 0, 0x60)
+			returndatacopy(0, 0, 0x60)
 			let arr := mload(0x20)
-			calldatacopy(0x20, arr, 0x20)
+			returndatacopy(0x20, arr, 0x20)
 			let arrLength := mload(0x20)
 			let giveByteLength := add(0x20, shl(6, arrLength))
-			calldatacopy(0xc0, arr, giveByteLength)
+			returndatacopy(0xc0, arr, giveByteLength)
 			arr := mload(0x40)
-			calldatacopy(0x20, arr, 0x20)
+			returndatacopy(0x20, arr, 0x20)
 			arrLength := mload(0x20)
 			let takeByteLength := add(0x20, shl(6, arrLength))
 			let ptr := add(0xc0, giveByteLength)
-			calldatacopy(ptr, arr, takeByteLength)
+			returndatacopy(ptr, arr, takeByteLength)
 			mstore(0x20, 0xa0)
 			mstore(0x40, 0xa0)
 			mstore(0x60, 0xc0)
@@ -80,7 +80,7 @@ contract MM is BasicBlueprint {
 		uint256 ts = factory.ragequitTimestamp(address(this));
 		require(ts != 0);
 		require(ts + delay >= block.timestamp);
-		blueprintManager.tryFlashTransferFrom(address(this), subaccount, msg.sender, 0, ops);
+		manager.tryFlashTransferFrom(address(this), subaccount, msg.sender, 0, ops);
 	}
 
 	function allowActions(uint256 count) external {
