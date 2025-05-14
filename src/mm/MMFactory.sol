@@ -2,11 +2,13 @@
 pragma solidity ^0.8.13;
 
 import {MM, IBlueprintManager} from "./MM.sol";
-// import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
-// import {IMarketMakerImplementation} from "../interfaces/IMarketMakerImplementation.sol";
+import {IMMFactory} from "../interfaces/IMMFactory.sol";
 
-contract MMFactory {
+contract MMFactory is IMMFactory {
 	IBlueprintManager immutable public manager;
+	mapping (address mm => uint256 timestamp) public ragequitTimestamp;
+
+	event Ragequit(address indexed mm, uint256 timestamp, bool status);
 
 	constructor(IBlueprintManager _manager) {
 		manager = _manager;
@@ -17,7 +19,17 @@ contract MMFactory {
 		address operator,
 		uint256 delay,
 		address implementation
-	) public returns (MM) {
-		return new MM(manager, holder, operator, delay, implementation);
+	) public returns (address) {
+		return address(new MM(manager, holder, operator, delay, implementation));
+	}
+
+	function ragequit(address mm, bool status) external {
+		require(msg.sender == MM(mm).holder());
+		if (status)
+			ragequitTimestamp[mm] = block.timestamp;
+		else
+			ragequitTimestamp[mm] = 0;
+
+		emit Ragequit(mm, block.timestamp, status);
 	}
 }

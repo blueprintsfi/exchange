@@ -3,16 +3,14 @@ pragma solidity ^0.8.13;
 
 import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
+import {IMMFactory} from "../interfaces/IMMFactory.sol";
 
 contract MM is BasicBlueprint {
-	uint256 public ragequitTimestamp;
-
 	address immutable public holder;
 	address immutable public operator;
 	uint256 immutable public delay;
 	address immutable public implementation;
-
-	event Ragequit(uint256 timestamp, bool status);
+	IMMFactory immutable public factory;
 
 	constructor(
 		IBlueprintManager manager,
@@ -25,6 +23,7 @@ contract MM is BasicBlueprint {
 		operator = _operator;
 		delay = _delay;
 		implementation = _implementation;
+		factory = IMMFactory(msg.sender);
 	}
 
 	function executeAction(bytes calldata action) external onlyManager returns (
@@ -76,19 +75,11 @@ contract MM is BasicBlueprint {
 		}
 	}
 
-	function ragequit(bool status) external {
-		require(msg.sender == holder);
-		if (status)
-			ragequitTimestamp = block.timestamp;
-		else
-			ragequitTimestamp = 0;
-
-		emit Ragequit(block.timestamp, status);
-	}
-
 	function withdraw(uint256 subaccount, TokenOp[] calldata ops) external {
 		require(msg.sender == holder);
-		require(ragequitTimestamp + delay >= block.timestamp);
+		uint256 ts = factory.ragequitTimestamp(address(this));
+		require(ts != 0);
+		require(ts + delay >= block.timestamp);
 		blueprintManager.tryFlashTransferFrom(address(this), subaccount, msg.sender, 0, ops);
 	}
 
