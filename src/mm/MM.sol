@@ -33,12 +33,11 @@ contract MM is BasicBlueprint {
 		TokenOp[] memory /*give*/,
 		TokenOp[] memory /*take*/
 	) {
-		uint256 remaining;
+		bool allowed;
 		assembly ("memory-safe") {
-			remaining := tload(0)
-			tstore(0, sub(remaining, 1)) // optimistically decrease permitted actions counter
+			allowed := tload(0)
 		}
-		if (remaining == 0)
+		if (!allowed)
 			revert AccessDenied();
 
 		(bool success,) = implementation.delegatecall(action);
@@ -83,10 +82,10 @@ contract MM is BasicBlueprint {
 		manager.tryFlashTransferFrom(address(this), subaccount, msg.sender, 0, ops);
 	}
 
-	function allowActions(uint256 count) external {
+	function allowActions(bool allow) external {
 		require(msg.sender == operator);
 		assembly ("memory-safe") {
-			tstore(0, count)
+			tstore(0, allow)
 		}
 	}
 }

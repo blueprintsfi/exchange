@@ -57,7 +57,7 @@ contract MMTest is Test {
 
 	function test_swap1() public {
 		vm.prank(operator);
-		MM(zeroFeeSwap).allowActions(1);
+		MM(zeroFeeSwap).allowActions(true);
 
 		BlueprintCall[] memory calls = new BlueprintCall[](1);
 		calls[0] = BlueprintCall(
@@ -71,6 +71,9 @@ contract MMTest is Test {
 			bytes32(0)
 		);
 		manager.cook(address(0), calls);
+
+		vm.prank(operator);
+		MM(zeroFeeSwap).allowActions(false);
 
 		assertEq(manager.balanceOf(address(this), token0), 1e9 ether - 1000 ether);
 		assertEq(manager.balanceOf(address(this), token1), 1e9 ether + 1000 ether);
