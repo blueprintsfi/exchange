@@ -5,7 +5,7 @@ import "forge-std/console.sol";
 
 import {zero, oneOpArray} from "../lib/core/src/blueprints/BasicBlueprint.sol";
 import {BlueprintManager, BlueprintCall, HashLib, TokenOp} from "../lib/core/src/BlueprintManager.sol";
-import {MM, MMFactory} from "../src/mm/MMFactory.sol";
+import {MMProxy, MMFactory} from "../src/mm/MMFactory.sol";
 
 contract StableSwap {
 	uint256 immutable token0;
@@ -57,7 +57,7 @@ contract MMTest is Test {
 
 	function test_swap1() public {
 		vm.prank(operator);
-		MM(zeroFeeSwap).allowActions(true);
+		MMProxy(zeroFeeSwap).allowActions(true);
 
 		BlueprintCall[] memory calls = new BlueprintCall[](1);
 		calls[0] = BlueprintCall(
@@ -73,7 +73,7 @@ contract MMTest is Test {
 		manager.cook(address(0), calls);
 
 		vm.prank(operator);
-		MM(zeroFeeSwap).allowActions(false);
+		MMProxy(zeroFeeSwap).allowActions(false);
 
 		assertEq(manager.balanceOf(address(this), token0), 1e9 ether - 1000 ether);
 		assertEq(manager.balanceOf(address(this), token1), 1e9 ether + 1000 ether);

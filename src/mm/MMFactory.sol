@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {MM, IBlueprintManager} from "./MM.sol";
+import {MMProxy, IBlueprintManager} from "./MMProxy.sol";
 import {IMMFactory} from "../interfaces/IMMFactory.sol";
 
 contract MMFactory is IMMFactory {
@@ -20,11 +20,11 @@ contract MMFactory is IMMFactory {
 		uint256 delay,
 		address implementation
 	) public returns (address) {
-		return address(new MM(manager, holder, operator, delay, implementation));
+		return address(new MMProxy(manager, holder, operator, delay, implementation));
 	}
 
 	function ragequit(address mm, bool status) external {
-		require(msg.sender == MM(mm).holder());
+		require(msg.sender == MMProxy(mm).holder());
 		if (status)
 			ragequitTimestamp[mm] = block.timestamp;
 		else

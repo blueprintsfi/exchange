@@ -5,12 +5,14 @@ import {BasicBlueprint} from "core/blueprints/BasicBlueprint.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {IMMFactory} from "../interfaces/IMMFactory.sol";
 
-contract MM is BasicBlueprint {
+contract MMProxy is BasicBlueprint {
 	address immutable public holder;
 	address immutable public operator;
 	uint256 immutable public delay;
 	address immutable public implementation;
 	IMMFactory immutable public factory;
+
+	error CallFailed();
 
 	constructor(
 		IBlueprintManager _manager,
