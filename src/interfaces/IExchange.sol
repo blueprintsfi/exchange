@@ -13,6 +13,7 @@ struct Swap {
 	uint256 toSubaccount;
 	uint256 deadlineAndNonce;
 	uint256 fillDenominator;
+	bytes32 auxData;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 }
@@ -27,14 +28,16 @@ struct BalanceInfo {
 struct SwapExecution {
 	address holder;
 	uint256 holderSubaccount;
-	// address operator;
+	// address operator; // inferred from the execution context as msg.sender
 	uint256 delay;
 	address to;
 	uint256 toSubaccount;
 	uint256 deadlineAndNonce;
 	uint256 fillDenominator;
+	bytes32 auxData;
 	TokenOp[] inputs;
 	TokenOp[] outputs;
+	// execution details
 	uint256 output;
 	address signer;
 	bytes signature;

@@ -35,6 +35,7 @@ bytes32 constant SWAP_TYPEHASH = keccak256(
 		"uint256 toSubaccount,"
 		"uint256 deadlineAndNonce,"
 		"uint256 fillDenominator,"
+		"bytes32 auxData,"
 		"TokenOp[] inputs,"
 		"TokenOp[] outputs"
 	")"
@@ -114,10 +115,12 @@ function hashSwap(address operator, SwapExecution calldata swap) pure returns (b
 		// mstore(add(ptr, 0xc0), calldataload(add(swap, 0x80))) // toSubaccount
 		// mstore(add(ptr, 0xe0), calldataload(add(swap, 0xa0))) // deadlineAndNonce
 		// mstore(add(ptr, 0x100), calldataload(add(swap, 0xc0))) // fillDenominator
-		calldatacopy(add(ptr, 0xc0), add(swap, 0x80), 0x60)
-		mstore(add(ptr, 0x120), inputsHash)
-		mstore(add(ptr, 0x140), outputsHash)
-		result := keccak256(ptr, 0x160)
+		// mstore(add(ptr, 0x120), calldataload(add(swap, 0xe0))) // auxData
+		// the above lines are expressed as:
+		calldatacopy(add(ptr, 0xc0), add(swap, 0x80), 0x80)
+		mstore(add(ptr, 0x140), inputsHash)
+		mstore(add(ptr, 0x160), outputsHash)
+		result := keccak256(ptr, 0x180)
 	}
 }
 
