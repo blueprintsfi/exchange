@@ -16,12 +16,12 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// Exchange public exchange;
 	// BlueprintManager public blueprintManager;
 	// address public user;
-	// address public operator;
+	// address public sequencer;
 	// uint256 public constant delay = 1 days;
 
 	// // Private keys for testing
 	// uint256 private userPrivateKey;
-	// uint256 private operatorPrivateKey;
+	// uint256 private sequencerPrivateKey;
 
 	// function _domainNameAndVersion() internal pure override returns (
 	// 	string memory name,
@@ -54,16 +54,16 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 
 	// function setUp() public {
 	// 	userPrivateKey = 0x1;
-	// 	operatorPrivateKey = 0x2;
+	// 	sequencerPrivateKey = 0x2;
 
 	// 	user = vm.addr(userPrivateKey);
-	// 	operator = vm.addr(operatorPrivateKey);
+	// 	sequencer = vm.addr(sequencerPrivateKey);
 
 	// 	blueprintManager = new BlueprintManager();
 	// 	exchange = new Exchange(blueprintManager);
 
 	// 	vm.label(user, "user");
-	// 	vm.label(operator, "operator");
+	// 	vm.label(sequencer, "sequencer");
 	// }
 
 	// function prepareTokensForTest(uint256 amount, uint256 seed) internal returns (uint256 tokenId) {
@@ -74,7 +74,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// }
 
 	// function encodeDepositAction(TokenOp[] memory deposits) internal view returns (bytes memory) {
-	// 	return abi.encode(user, 0, operator, delay, deposits);
+	// 	return abi.encode(user, 0, sequencer, delay, deposits);
 	// }
 
 	// function executeDepositViaManager(bytes memory action) internal {
@@ -98,7 +98,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 
 	// 	executeDepositViaManager(act);
 
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, 100, "Balance should be 100 after deposit");
 	// }
 
@@ -111,18 +111,18 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	bytes memory act = encodeDepositAction(dep);
 	// 	executeDepositViaManager(act);
 
-	// 	uint256 bal1 = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal1 = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal1, 200, "Should be equal to 200");
 
 	// 	vm.prank(user);
-	// 	exchange.ragequit(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
 	// 	vm.warp(block.timestamp + delay + 1);
 
 	// 	TokenOp[] memory wd = new TokenOp[](1);
 	// 	wd[0] = TokenOp(id, 150);
 	// 	vm.prank(user);
-	// 	exchange.rageWithdraw(user, 0, user, operator, delay, wd);
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	exchange.rageWithdraw(user, 0, user, sequencer, delay, wd);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, 50, "After rageWithdraw, remaining balance should be 50");
 	// }
 
@@ -181,7 +181,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	Swap memory swap;
 	// 	swap.holder = user;
 	// 	swap.holderSubaccount = 0;
-	// 	swap.operator = operator;
+	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.to = user;
 	// 	swap.toSubaccount = 0;
@@ -242,12 +242,12 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	assertTrue(isSigner, "Subaccount signer should be set");
 	// }
 
-	// function test_OperatorCancel() public {
+	// function test_SequencerCancel() public {
 	// 	// Construct a dummy Swap
 	// 	Swap memory swap;
 	// 	swap.holder = user;
 	// 	swap.holderSubaccount = 0;
-	// 	swap.operator = operator;
+	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.deadlineAndNonce = (block.timestamp + 1000) << 128 | 1;
 	// 	swap.to = user;
@@ -266,11 +266,11 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 
 	// 	Swap[] memory swaps = new Swap[](1);
 	// 	swaps[0] = swap;
-	// 	vm.prank(operator);
-	// 	exchange.operatorCancel(swaps);
+	// 	vm.prank(sequencer);
+	// 	exchange.sequencerCancel(swaps);
 
 	// 	uint256 fillStatus = exchange.fill(user, orderId);
-	// 	assertEq(fillStatus, type(uint256).max, "Operator cancel should set fill to max");
+	// 	assertEq(fillStatus, type(uint256).max, "Sequencer cancel should set fill to max");
 	// }
 
 	// function test_MultipleDepositsAccumulation() public {
@@ -288,7 +288,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	bytes memory act2 = encodeDepositAction(dep2);
 	// 	executeDepositViaManager(act2);
 
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, 75, "Accumulated deposit should be 75");
 	// }
 
@@ -309,20 +309,20 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	bytes memory act2 = encodeDepositAction(dep2);
 	// 	executeDepositViaManager(act2);
 
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, amount1 + amount2, "Accumulated deposit incorrect");
 	// }
 
-	// function test_DepositDifferentOperators() public {
+	// function test_DepositDifferentSequencers() public {
 	// 	uint256 id = prepareTokensForTest(10000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, 100);
 
-	// 	// Deposit for operatorA
-	// 	address operatorA = vm.addr(0x3);
-	// 	vm.label(operatorA, "operatorA");
+	// 	// Deposit for sequencerA
+	// 	address sequencerA = vm.addr(0x3);
+	// 	vm.label(sequencerA, "sequencerA");
 	// 	{
-	// 		bytes memory actA = abi.encode(user, 0, operatorA, delay, dep);
+	// 		bytes memory actA = abi.encode(user, 0, sequencerA, delay, dep);
 	// 		BlueprintCall[] memory calls = new BlueprintCall[](1);
 	// 		calls[0] = BlueprintCall({
 	// 			blueprint: address(exchange),
@@ -334,11 +334,11 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 		blueprintManager.cook(address(exchange), calls);
 	// 	}
 
-	// 	// Deposit for operatorB
-	// 	address operatorB = vm.addr(0x4);
-	// 	vm.label(operatorB, "operatorB");
+	// 	// Deposit for sequencerB
+	// 	address sequencerB = vm.addr(0x4);
+	// 	vm.label(sequencerB, "sequencerB");
 	// 	{
-	// 		bytes memory actB = abi.encode(user, 0, operatorB, delay, dep);
+	// 		bytes memory actB = abi.encode(user, 0, sequencerB, delay, dep);
 	// 		BlueprintCall[] memory calls = new BlueprintCall[](1);
 	// 		calls[0] = BlueprintCall({
 	// 			blueprint: address(exchange),
@@ -350,26 +350,26 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 		blueprintManager.cook(address(exchange), calls);
 	// 	}
 
-	// 	uint256 balA = exchange.getBalance(user, 0, operatorA, delay, id);
-	// 	uint256 balB = exchange.getBalance(user, 0, operatorB, delay, id);
-	// 	assertEq(balA, 100, "OperatorA balance should be 100");
-	// 	assertEq(balB, 100, "OperatorB balance should be 100");
+	// 	uint256 balA = exchange.getBalance(user, 0, sequencerA, delay, id);
+	// 	uint256 balB = exchange.getBalance(user, 0, sequencerB, delay, id);
+	// 	assertEq(balA, 100, "SequencerA balance should be 100");
+	// 	assertEq(balB, 100, "SequencerB balance should be 100");
 	// }
 
 	// function test_DepositEmptyArray() public {
 	// 	TokenOp[] memory dep = new TokenOp[](0);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, 1);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, 1);
 	// 	assertEq(bal, 0, "Empty deposit should leave balance unchanged");
 	// }
 
 	// function test_DepositZeroAmount() public {
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(1, 0);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, 1);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, 1);
 	// 	assertEq(bal, 0, "Deposit of zero amount should leave balance unchanged");
 	// }
 
@@ -378,9 +378,9 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	uint256 id = prepareTokensForTest(1000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, amount);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, amount, "Fuzz deposit should record correct balance");
 	// }
 
@@ -388,38 +388,38 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	uint256 id = prepareTokensForTest(1000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, 100);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
 
 	// 	vm.prank(user);
-	// 	exchange.ragequit(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
 
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.ragequit(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
 	// }
 
 	// function test_UnragequitWithoutRagequitReverts() public {
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.unragequit(user, operator, delay);
+	// 	exchange.unragequit(user, sequencer, delay);
 	// }
 
 	// function test_RagequitAndUnragequit() public {
 	// 	uint256 id = prepareTokensForTest(1000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, 200);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
 
 	// 	vm.prank(user);
-	// 	exchange.ragequit(user, operator, delay);
-	// 	(, uint256 rqTime) = exchange.userData(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
+	// 	(, uint256 rqTime) = exchange.userData(user, sequencer, delay);
 	// 	assertTrue(rqTime != 0, "Ragequit time should be set");
 
 	// 	vm.prank(user);
-	// 	exchange.unragequit(user, operator, delay);
-	// 	(, uint256 rqTimeAfter) = exchange.userData(user, operator, delay);
+	// 	exchange.unragequit(user, sequencer, delay);
+	// 	(, uint256 rqTimeAfter) = exchange.userData(user, sequencer, delay);
 	// 	assertEq(rqTimeAfter, 0, "Ragequit time should be cleared");
 	// }
 
@@ -427,46 +427,46 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	uint256 id = prepareTokensForTest(1000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, 100);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
 
 	// 	vm.prank(user);
-	// 	exchange.ragequit(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
 
 	// 	TokenOp[] memory wd = new TokenOp[](1);
 	// 	wd[0] = TokenOp(id, 50);
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.rageWithdraw(user, 0, user, operator, delay, wd);
+	// 	exchange.rageWithdraw(user, 0, user, sequencer, delay, wd);
 	// }
 
-	// function test_FuzzDepositDifferentOperators(uint256 amount1, uint256 amount2) public {
+	// function test_FuzzDepositDifferentSequencers(uint256 amount1, uint256 amount2) public {
 	// 	amount1 = bound(amount1, 1, 5000);
 	// 	amount2 = bound(amount2, 1, 5000);
 	// 	uint256 id = prepareTokensForTest(10000, 0);
 
-	// 	address operatorA = vm.addr(0x3);
-	// 	vm.label(operatorA, "operatorA");
+	// 	address sequencerA = vm.addr(0x3);
+	// 	vm.label(sequencerA, "sequencerA");
 	// 	{
 	// 		TokenOp[] memory dep = new TokenOp[](1);
 	// 		dep[0] = TokenOp(id, amount1);
-	// 		bytes memory actA = abi.encode(user, 0, operatorA, delay, dep);
+	// 		bytes memory actA = abi.encode(user, 0, sequencerA, delay, dep);
 	// 		executeDepositViaManager(actA);
 	// 	}
 
-	// 	address operatorB = vm.addr(0x4);
-	// 	vm.label(operatorB, "operatorB");
+	// 	address sequencerB = vm.addr(0x4);
+	// 	vm.label(sequencerB, "sequencerB");
 	// 	{
 	// 		TokenOp[] memory dep = new TokenOp[](1);
 	// 		dep[0] = TokenOp(id, amount2);
-	// 		bytes memory actB = abi.encode(user, 0, operatorB, delay, dep);
+	// 		bytes memory actB = abi.encode(user, 0, sequencerB, delay, dep);
 	// 		executeDepositViaManager(actB);
 	// 	}
 
-	// 	uint256 balA = exchange.getBalance(user, 0, operatorA, delay, id);
-	// 	uint256 balB = exchange.getBalance(user, 0, operatorB, delay, id);
-	// 	assertEq(balA, amount1, "OperatorA balance incorrect");
-	// 	assertEq(balB, amount2, "OperatorB balance incorrect");
+	// 	uint256 balA = exchange.getBalance(user, 0, sequencerA, delay, id);
+	// 	uint256 balB = exchange.getBalance(user, 0, sequencerB, delay, id);
+	// 	assertEq(balA, amount1, "SequencerA balance incorrect");
+	// 	assertEq(balB, amount2, "SequencerB balance incorrect");
 	// }
 
 	// function test_FuzzRageWithdrawAfterDelay(uint256 depositAmount, uint256 withdrawAmount) public {
@@ -476,18 +476,18 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	uint256 id = prepareTokensForTest(1000, 0);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, depositAmount);
-	// 	bytes memory act = abi.encode(user, 0, operator, delay, dep);
+	// 	bytes memory act = abi.encode(user, 0, sequencer, delay, dep);
 	// 	executeDepositViaManager(act);
 
 	// 	vm.prank(user);
-	// 	exchange.ragequit(user, operator, delay);
+	// 	exchange.ragequit(user, sequencer, delay);
 	// 	vm.warp(block.timestamp + delay + 1);
 
 	// 	TokenOp[] memory wd = new TokenOp[](1);
 	// 	wd[0] = TokenOp(id, withdrawAmount);
 	// 	vm.prank(user);
-	// 	exchange.rageWithdraw(user, 0, user, operator, delay, wd);
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	exchange.rageWithdraw(user, 0, user, sequencer, delay, wd);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, depositAmount - withdrawAmount, "Remaining balance incorrect after rageWithdraw");
 	// }
 
@@ -499,7 +499,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	Swap memory swap;
 	// 	swap.holder = user;
 	// 	swap.holderSubaccount = 0;
-	// 	swap.operator = operator;
+	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.deadlineAndNonce = futureTime << 128 | 1;
 	// 	swap.to = user;
@@ -552,15 +552,15 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 
 	// 	bytes32 digest = getExchangeDigest(withdrawHash);
 
-	// 	(uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorPrivateKey, digest);
+	// 	(uint8 v, bytes32 r, bytes32 s) = vm.sign(sequencerPrivateKey, digest);
 	// 	bytes memory signature = abi.encodePacked(r, s, v);
 
-	// 	assertTrue(isValidSig(operator, digest, signature), "Operator signature should be valid");
+	// 	assertTrue(isValidSig(sequencer, digest, signature), "Sequencer signature should be valid");
 
 	// 	vm.prank(user);
-	// 	exchange.withdraw(user, 0, user, operator, delay, 1, withdrawals, signature);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 1, withdrawals, signature);
 
-	// 	uint256 bal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 bal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(bal, 0, "Balance should be 0 after withdraw");
 	// }
 
@@ -641,11 +641,11 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	uint256 id = prepareTokensForTest(1000, 5);
 	// 	TokenOp[] memory dep = new TokenOp[](1);
 	// 	dep[0] = TokenOp(id, 150);
-	// 	bytes memory act = abi.encode(user, 1, operator, delay, dep); // Note subaccount 1
+	// 	bytes memory act = abi.encode(user, 1, sequencer, delay, dep); // Note subaccount 1
 	// 	executeDepositViaManager(act);
 
 	// 	// Verify deposit
-	// 	uint256 balBefore = exchange.getBalance(user, 1, operator, delay, id);
+	// 	uint256 balBefore = exchange.getBalance(user, 1, sequencer, delay, id);
 	// 	assertEq(balBefore, 150, "Subaccount balance should be 150 after deposit");
 
 	// 	// Prepare withdrawal
@@ -661,15 +661,15 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	);
 
 	// 	digest = getExchangeDigest(withdrawHash);
-	// 	(v, r, s) = vm.sign(operatorPrivateKey, digest);
+	// 	(v, r, s) = vm.sign(sequencerPrivateKey, digest);
 	// 	signature = abi.encodePacked(r, s, v);
 
 	// 	// Withdraw using subaccount signer
 	// 	vm.prank(subAddr1);
-	// 	exchange.withdraw(user, 1, user, operator, delay, 1, withdrawals, signature);
+	// 	exchange.withdraw(user, 1, user, sequencer, delay, 1, withdrawals, signature);
 
 	// 	// Verify remaining balance
-	// 	uint256 balAfter = exchange.getBalance(user, 1, operator, delay, id);
+	// 	uint256 balAfter = exchange.getBalance(user, 1, sequencer, delay, id);
 	// 	assertEq(balAfter, 50, "Subaccount balance should be 50 after withdrawal");
 	// }
 
@@ -698,12 +698,12 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	bytes memory invalidSignature = abi.encodePacked(r, s, v);
 
 	// 	// The signature should fail validation
-	// 	assertFalse(isValidSig(operator, digest, invalidSignature), "Signature should not be valid");
+	// 	assertFalse(isValidSig(sequencer, digest, invalidSignature), "Signature should not be valid");
 
 	// 	// Attempt to withdraw with invalid signature
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.withdraw(user, 0, user, operator, delay, 1, withdrawals, invalidSignature);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 1, withdrawals, invalidSignature);
 	// }
 
 	// function test_WithdrawInsufficientBalance() public {
@@ -728,13 +728,13 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	);
 
 	// 	bytes32 digest = getExchangeDigest(withdrawHash);
-	// 	(uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorPrivateKey, digest);
+	// 	(uint8 v, bytes32 r, bytes32 s) = vm.sign(sequencerPrivateKey, digest);
 	// 	bytes memory signature = abi.encodePacked(r, s, v);
 
 	// 	// Should revert due to insufficient balance
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.withdraw(user, 0, user, operator, delay, 1, withdrawals, signature);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 1, withdrawals, signature);
 	// }
 
 	// function test_WithdrawNonceReuse() public {
@@ -759,14 +759,14 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	);
 
 	// 	bytes32 digest1 = getExchangeDigest(withdrawHash1);
-	// 	(uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(operatorPrivateKey, digest1);
+	// 	(uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(sequencerPrivateKey, digest1);
 	// 	bytes memory signature1 = abi.encodePacked(r1, s1, v1);
 
 	// 	vm.prank(user);
-	// 	exchange.withdraw(user, 0, user, operator, delay, 1, withdrawals1, signature1);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 1, withdrawals1, signature1);
 
 	// 	// Check balance after first withdrawal
-	// 	uint256 balAfter1 = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 balAfter1 = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(balAfter1, 150, "Balance should be 150 after first withdrawal");
 
 	// 	// Second withdrawal with nonce 1 again (should fail)
@@ -782,12 +782,12 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	);
 
 	// 	bytes32 digest2 = getExchangeDigest(withdrawHash2);
-	// 	(uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(operatorPrivateKey, digest2);
+	// 	(uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(sequencerPrivateKey, digest2);
 	// 	bytes memory signature2 = abi.encodePacked(r2, s2, v2);
 
 	// 	vm.prank(user);
 	// 	vm.expectRevert();
-	// 	exchange.withdraw(user, 0, user, operator, delay, 1, withdrawals2, signature2);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 1, withdrawals2, signature2);
 
 	// 	// Withdrawal with nonce 2 should succeed
 	// 	bytes32 withdrawHash3 = TypedDataHashLib.hashWithdraw(
@@ -799,14 +799,14 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	);
 
 	// 	bytes32 digest3 = getExchangeDigest(withdrawHash3);
-	// 	(uint8 v3, bytes32 r3, bytes32 s3) = vm.sign(operatorPrivateKey, digest3);
+	// 	(uint8 v3, bytes32 r3, bytes32 s3) = vm.sign(sequencerPrivateKey, digest3);
 	// 	bytes memory signature3 = abi.encodePacked(r3, s3, v3);
 
 	// 	vm.prank(user);
-	// 	exchange.withdraw(user, 0, user, operator, delay, 2, withdrawals2, signature3);
+	// 	exchange.withdraw(user, 0, user, sequencer, delay, 2, withdrawals2, signature3);
 
 	// 	// Check final balance
-	// 	uint256 balFinal = exchange.getBalance(user, 0, operator, delay, id);
+	// 	uint256 balFinal = exchange.getBalance(user, 0, sequencer, delay, id);
 	// 	assertEq(balFinal, 100, "Balance should be 100 after second withdrawal");
 	// }
 
@@ -818,7 +818,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	{
 	// 		TokenOp[] memory dep = new TokenOp[](1);
 	// 		dep[0] = TokenOp(id, 200);
-	// 		bytes memory act = abi.encode(user, 1, operator, delay, dep); // subaccount 1
+	// 		bytes memory act = abi.encode(user, 1, sequencer, delay, dep); // subaccount 1
 	// 		executeDepositViaManager(act);
 	// 	}
 
@@ -826,13 +826,13 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	{
 	// 		TokenOp[] memory dep = new TokenOp[](1);
 	// 		dep[0] = TokenOp(id, 50);
-	// 		bytes memory act = abi.encode(user, 2, operator, delay, dep); // subaccount 2
+	// 		bytes memory act = abi.encode(user, 2, sequencer, delay, dep); // subaccount 2
 	// 		executeDepositViaManager(act);
 	// 	}
 
 	// 	// Verify initial balances
-	// 	uint256 balSubaccount1 = exchange.getBalance(user, 1, operator, delay, id);
-	// 	uint256 balSubaccount2 = exchange.getBalance(user, 2, operator, delay, id);
+	// 	uint256 balSubaccount1 = exchange.getBalance(user, 1, sequencer, delay, id);
+	// 	uint256 balSubaccount2 = exchange.getBalance(user, 2, sequencer, delay, id);
 	// 	assertEq(balSubaccount1, 200, "Subaccount 1 should have 200 tokens");
 	// 	assertEq(balSubaccount2, 50, "Subaccount 2 should have 50 tokens");
 
@@ -842,7 +842,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	swap.holderSubaccount = 1; // From subaccount 1
 	// 	swap.to = user;
 	// 	swap.toSubaccount = 2; // To subaccount 2
-	// 	swap.operator = operator;
+	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.deadlineAndNonce = (block.timestamp + 1000) << 128 | 1;
 
@@ -863,7 +863,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 		swap.holderSubaccount,
 	// 		swap.to,
 	// 		swap.toSubaccount,
-	// 		operator,
+	// 		sequencer,
 	// 		swap.delay,
 	// 		swap.deadlineAndNonce,
 	// 		swap.inputs,
@@ -882,13 +882,13 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	bytes[] memory signatures = new bytes[](1);
 	// 	signatures[0] = signature;
 
-	// 	// Execute the swap as the operator
-	// 	vm.prank(operator);
+	// 	// Execute the swap as the sequencer
+	// 	vm.prank(sequencer);
 	// 	exchange.executeSwaps(swapExecutions, signatures);
 
 	// 	// Verify balances after the swap
-	// 	uint256 balSubaccount1After = exchange.getBalance(user, 1, operator, delay, id);
-	// 	uint256 balSubaccount2After = exchange.getBalance(user, 2, operator, delay, id);
+	// 	uint256 balSubaccount1After = exchange.getBalance(user, 1, sequencer, delay, id);
+	// 	uint256 balSubaccount2After = exchange.getBalance(user, 2, sequencer, delay, id);
 
 	// 	// Due to GCD calculations, the actual values may differ from our expectations
     //     // The test is now updated to use the actual values from the contract

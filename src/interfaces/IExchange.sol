@@ -7,7 +7,7 @@ import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 struct Swap {
 	address holder;
 	uint256 holderSubaccount;
-	address operator;
+	address sequencer;
 	uint256 delay;
 	address to;
 	uint256 toSubaccount;
@@ -21,14 +21,14 @@ struct Swap {
 struct BalanceInfo {
 	address holder;
 	uint256 subaccount;
-	address operator;
+	address sequencer;
 	uint256 delay;
 }
 
 struct SwapExecution {
 	address holder;
 	uint256 holderSubaccount;
-	// address operator; // inferred from the execution context as msg.sender
+	// address sequencer; // inferred from the execution context as msg.sender
 	uint256 delay;
 	address to;
 	uint256 toSubaccount;
@@ -43,7 +43,7 @@ struct SwapExecution {
 	bytes signature;
 }
 
-struct OperatorTransfer {
+struct SequencerTransfer {
 	uint256 toSubaccount;
 	TokenOp[] amounts;
 }
@@ -92,8 +92,8 @@ interface IExchange  {
 	/// @notice Thrown when an order has expired
 	error OrderExpired();
 
-	/// @notice Thrown when trying to execute a swap with wrong operator
-	error WrongOperator();
+	/// @notice Thrown when trying to execute a swap with wrong sequencer
+	error WrongSequencer();
 
 	/// @notice Thrown the fill denominator is too large or zero
 	error InvalidFillDenominator();
@@ -112,35 +112,35 @@ interface IExchange  {
 
 	/// @notice Emitted when tokens are deposited into the exchange
 	/// @param depositFor The address receiving the deposit
-	/// @param operator The operator address
+	/// @param sequencer The sequencer address
 	/// @param delay The delay period for the deposit
 	/// @param deposits Array of token operations containing deposit details
 	event Deposit(
 		address indexed depositFor,
-		address indexed operator,
+		address indexed sequencer,
 		uint256 indexed delay,
 		TokenOp[] deposits
 	);
 
 	/// @notice Emitted when a user initiates ragequit
 	/// @param holder The address initiating ragequit
-	/// @param operator The operator address
+	/// @param sequencer The sequencer address
 	/// @param sender The address that initiated the ragequit
 	/// @param timestamp When the ragequit was initiated
 	event Ragequit(
 		address indexed holder,
-		address indexed operator,
+		address indexed sequencer,
 		address sender,
 		uint256 timestamp
 	);
 
 	/// @notice Emitted when a user cancels their ragequit
 	/// @param holder The address canceling ragequit
-	/// @param operator The operator address
+	/// @param sequencer The sequencer address
 	/// @param sender The address that canceled the ragequit
 	event Unragequit(
 		address indexed holder,
-		address indexed operator,
+		address indexed sequencer,
 		address sender
 	);
 
@@ -175,13 +175,13 @@ interface IExchange  {
 	/// @notice Emitted when a withdrawal is performed
 	/// @param holder The address withdrawing funds
 	/// @param subaccount The subaccount identifier
-	/// @param operator The operator address
+	/// @param sequencer The sequencer address
 	/// @param delay The delay period
 	/// @param withdrawals Array of token operations being withdrawn
 	event Withdraw(
 		address indexed holder,
 		uint256 indexed subaccount,
-		address indexed operator,
+		address indexed sequencer,
 		uint256 delay,
 		TokenOp[] withdrawals
 	);

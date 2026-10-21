@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {HashLib} from "core/libraries/HashLib.sol";
 import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol";
 import {hashWithdrawal, hashSwap, hashSetSigner} from "./libraries/ExchangeHashing.sol";
-import {IExchange, UserData, SwapExecution, BalanceInfo, OperatorTransfer} from "./interfaces/IExchange.sol";
+import {IExchange, UserData, SwapExecution, BalanceInfo, SequencerTransfer} from "./interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
@@ -14,7 +14,7 @@ function isValidSig(address signer, bytes32 hash, bytes calldata signature) view
 
 contract Exchange is IExchange, EIP712 {
 	IBlueprintManager public immutable manager;
-	mapping (address holder => mapping (address operator => UserData data)) public userData;
+	mapping (address holder => mapping (address sequencer => UserData data)) public userData;
 	mapping (address holder =>
 		mapping (uint256 subaccount =>
 			mapping (address signer => uint256 signerInfo))) public signers;
@@ -35,26 +35,26 @@ contract Exchange is IExchange, EIP712 {
 	function getSubaccount(
 		address holder,
 		uint256 exchangeSubaccount,
-		address operator,
+		address sequencer,
 		uint256 delay
 	) public pure returns (uint256 subaccount) {
 		subaccount = HashLib.hash(holder, exchangeSubaccount);
-		subaccount = HashLib.hash(operator, subaccount);
+		subaccount = HashLib.hash(sequencer, subaccount);
 		subaccount = HashLib.hash(delay, subaccount);
 	}
 
 	function getSubaccount(BalanceInfo calldata info) public pure returns (uint256 subaccount) {
-		return getSubaccount(info.holder, info.subaccount, info.operator, info.delay);
+		return getSubaccount(info.holder, info.subaccount, info.sequencer, info.delay);
 	}
 
 	function getBalance(
 		address holder,
 		uint256 exchangeSubaccount,
-		address operator,
+		address sequencer,
 		uint256 delay,
 		uint256 tokenId
 	) external view returns (uint256 balance) {
-		uint256 subaccount = getSubaccount(holder, exchangeSubaccount, operator, delay);
+		uint256 subaccount = getSubaccount(holder, exchangeSubaccount, sequencer, delay);
 		balance = manager.balanceOf(address(this), subaccount, tokenId);
 	}
 
@@ -80,30 +80,30 @@ contract Exchange is IExchange, EIP712 {
 	}
 
 	function authorizedDelay(BalanceInfo calldata info) internal view returns (bool) {
-		if (msg.sender == info.operator)
+		if (msg.sender == info.sequencer)
 			return true;
 		if (!hasAccess(msg.sender, info.holder, info.subaccount, 0))
 			return false;
-		uint256 ts = userData[info.holder][info.operator].ragequitTime;
+		uint256 ts = userData[info.holder][info.sequencer].ragequitTime;
 		return ts != 0 && ts + info.delay <= block.timestamp;
 	}
 
-	function ragequit(address holder, address operator) external {
+	function ragequit(address holder, address sequencer) external {
 		if (!hasAccess(msg.sender, holder, 0, 0))
 			revert Unauthorized();
-		if (userData[holder][operator].ragequitTime != 0)
+		if (userData[holder][sequencer].ragequitTime != 0)
 			revert RagequitAlreadySet();
-		userData[holder][operator].ragequitTime = block.timestamp;
-		emit Ragequit(holder, operator, msg.sender, block.timestamp);
+		userData[holder][sequencer].ragequitTime = block.timestamp;
+		emit Ragequit(holder, sequencer, msg.sender, block.timestamp);
 	}
 
-	function unragequit(address holder, address operator) external {
+	function unragequit(address holder, address sequencer) external {
 		if (!hasAccess(msg.sender, holder, 0, 0))
 			revert Unauthorized();
-		if (userData[holder][operator].ragequitTime == 0)
+		if (userData[holder][sequencer].ragequitTime == 0)
 			revert NoRagequitSet();
-		userData[holder][operator].ragequitTime = 0;
-		emit Unragequit(holder, operator, msg.sender);
+		userData[holder][sequencer].ragequitTime = 0;
+		emit Unragequit(holder, sequencer, msg.sender);
 	}
 
 	function withdraw(
@@ -114,17 +114,17 @@ contract Exchange is IExchange, EIP712 {
 	) external {
 		if (!authorizedDelay(info)) {
 			bytes32 withdrawalHash = hashWithdrawal(info, nonce, withdrawals);
-			if (!isValidSig(info.operator, _hashTypedData(withdrawalHash), signature))
+			if (!isValidSig(info.sequencer, _hashTypedData(withdrawalHash), signature))
 				revert InvalidSignature();
 		}
 
-		if (userData[info.holder][info.operator].nonce >= nonce)
+		if (userData[info.holder][info.sequencer].nonce >= nonce)
 			revert InvalidNonce();
 
-		userData[info.holder][info.operator].nonce = nonce;
+		userData[info.holder][info.sequencer].nonce = nonce;
 
 		manager.transferFrom(address(this), getSubaccount(info), info.holder, 0, withdrawals);
-		emit Withdraw(info.holder, info.subaccount, info.operator, info.delay, withdrawals);
+		emit Withdraw(info.holder, info.subaccount, info.sequencer, info.delay, withdrawals);
 	}
 
 	function cancel(BalanceInfo calldata info, bytes32[] calldata orderIds) external {
@@ -179,7 +179,7 @@ contract Exchange is IExchange, EIP712 {
 	}
 
 	function executeSwaps(SwapExecution[] calldata swaps) external {
-		uint256 operatorSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
+		uint256 sequencerSubaccount = getSubaccount(msg.sender, 0, msg.sender, 0);
 		for (uint256 i = 0; i < swaps.length; i++) {
 			SwapExecution calldata swap = swaps[i];
 			address holder = swap.holder;
@@ -224,7 +224,7 @@ contract Exchange is IExchange, EIP712 {
 					});
 				}
 			}
-			manager.flashTransferFrom(address(this), fromSubaccount, address(this), operatorSubaccount, inputs);
+			manager.flashTransferFrom(address(this), fromSubaccount, address(this), sequencerSubaccount, inputs);
 
 			TokenOp[] memory outputs = new TokenOp[](swap.outputs.length);
 			// negate fills to easily round up - they are now amounts remaining
@@ -243,16 +243,16 @@ contract Exchange is IExchange, EIP712 {
 					});
 				}
 			}
-			manager.flashTransferFrom(address(this), operatorSubaccount, swap.to, swap.toSubaccount, outputs);
+			manager.flashTransferFrom(address(this), sequencerSubaccount, swap.to, swap.toSubaccount, outputs);
 		}
 	}
 
-	function operatorFlashTransfer(OperatorTransfer[] calldata transfers) external {
-		uint256 operator = getSubaccount(msg.sender, 0, msg.sender, 0);
+	function sequencerFlashTransfer(SequencerTransfer[] calldata transfers) external {
+		uint256 sequencer = getSubaccount(msg.sender, 0, msg.sender, 0);
 		for (uint256 i = 0; i < transfers.length; i++) {
 			uint256 to = transfers[i].toSubaccount;
 			TokenOp[] calldata ops = transfers[i].amounts;
-			manager.flashTransferFrom(address(this), operator, address(this), to, ops);
+			manager.flashTransferFrom(address(this), sequencer, address(this), to, ops);
 		}
 	}
 }
