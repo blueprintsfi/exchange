@@ -6,6 +6,7 @@ import {IBlueprintManager, TokenOp} from "core/interfaces/IBlueprintManager.sol"
 import {hashWithdrawal, hashSwap, hashSetSigner} from "./libraries/ExchangeHashing.sol";
 import {IExchange, UserData, SwapExecution, BalanceInfo, SequencerTransfer} from "./interfaces/IExchange.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
+import {FixedPointMathLib as Math} from "solady/utils/FixedPointMathLib.sol";
 import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 
 function isValidSig(address signer, bytes32 hash, bytes calldata signature) view returns (bool) {
@@ -214,15 +215,11 @@ contract Exchange is IExchange, EIP712 {
 			TokenOp[] memory inputs = new TokenOp[](swap.inputs.length);
 			for (uint256 j = 0; j < inputs.length; j++) {
 				uint256 amount = swap.inputs[j].amount;
-				unchecked {
-					// revert if multiplication would overflow
-					if (denominator * amount / denominator != amount)
-						revert InvalidFillDenominator();
-					inputs[j] = TokenOp({
-						tokenId: swap.inputs[j].tokenId,
-						amount: amount * newFill / denominator - amount * previousFill / denominator
-					});
-				}
+				inputs[j] = TokenOp({
+					tokenId: swap.inputs[j].tokenId,
+					amount: Math.fullMulDiv(amount, newFill, denominator)
+						- Math.fullMulDiv(amount, previousFill, denominator)
+				});
 			}
 			manager.flashTransferFrom(address(this), fromSubaccount, address(this), sequencerSubaccount, inputs);
 
@@ -232,16 +229,12 @@ contract Exchange is IExchange, EIP712 {
 			previousFill = denominator - previousFill;
 			for (uint256 j = 0; j < outputs.length; j++) {
 				uint256 amount = swap.outputs[j].amount;
-				unchecked {
-					// revert if multiplication would overflow
-					if (denominator * amount / denominator != amount)
-						revert InvalidFillDenominator();
-					outputs[j] = TokenOp({
-						tokenId: swap.outputs[j].tokenId,
-						// amount remaining before minus amount remaining after swap
-						amount: amount * previousFill / denominator - amount * newFill / denominator
-					});
-				}
+				outputs[j] = TokenOp({
+					tokenId: swap.outputs[j].tokenId,
+					// amount remaining before minus amount remaining after swap
+					amount: Math.fullMulDiv(amount, previousFill, denominator)
+						- Math.fullMulDiv(amount, newFill, denominator)
+				});
 			}
 			manager.flashTransferFrom(address(this), sequencerSubaccount, swap.to, swap.toSubaccount, outputs);
 		}
