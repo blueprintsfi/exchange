@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {SwapExecution, BalanceInfo, TokenOp} from "../interfaces/IExchange.sol";
+import {SwapExecution, BalanceInfo, TokenOp, ExchangeSubaccount} from "../interfaces/IExchange.sol";
 
 bytes32 constant TOKENOP_TYPEHASH = keccak256(
 	"TokenOp("
@@ -108,7 +108,7 @@ function hashSwap(address operator, SwapExecution calldata swap) pure returns (b
 		let ptr := mload(0x40)
 		mstore(ptr, typehash)
 		mstore(add(ptr, 0x20), and(calldataload(swap), ADDRESS_MASK)) // holder
-		mstore(add(ptr, 0x40), calldataload(add(swap, 0x20))) // holderSubaccount
+		mstore(add(ptr, 0x40), calldataload(add(swap, 0x20))) // exchangeSubaccount
 		mstore(add(ptr, 0x60), and(operator, ADDRESS_MASK))
 		mstore(add(ptr, 0x80), calldataload(add(swap, 0x40))) // delay
 		mstore(add(ptr, 0xa0), and(calldataload(add(swap, 0x60)), ADDRESS_MASK)) // to
@@ -126,7 +126,7 @@ function hashSwap(address operator, SwapExecution calldata swap) pure returns (b
 
 function hashSetSigner(
 	address holder,
-	uint256 subaccount,
+	ExchangeSubaccount subaccount,
 	address signer,
 	uint256 deadline,
 	bool isSigner

@@ -3,14 +3,16 @@ pragma solidity ^0.8.13;
 
 import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 
+type ExchangeSubaccount is uint256;
+
 // note: for eip-712 documentation only, not used in code
 struct Swap {
 	address holder;
-	uint256 holderSubaccount;
+	ExchangeSubaccount subaccount;
 	address sequencer;
 	uint256 delay;
 	address to;
-	uint256 toSubaccount;
+	uint256 toSubaccount; // in terms of BlueprintManager's subaccounts
 	uint256 deadlineAndNonce;
 	uint256 fillDenominator;
 	bytes32 auxData;
@@ -20,14 +22,14 @@ struct Swap {
 
 struct BalanceInfo {
 	address holder;
-	uint256 subaccount;
+	ExchangeSubaccount subaccount;
 	address sequencer;
 	uint256 delay;
 }
 
 struct SwapExecution {
 	address holder;
-	uint256 holderSubaccount;
+	ExchangeSubaccount subaccount;
 	// address sequencer; // inferred from the execution context as msg.sender
 	uint256 delay;
 	address to;
@@ -180,7 +182,7 @@ interface IExchange  {
 	/// @param withdrawals Array of token operations being withdrawn
 	event Withdraw(
 		address indexed holder,
-		uint256 indexed subaccount,
+		ExchangeSubaccount indexed subaccount,
 		address indexed sequencer,
 		uint256 delay,
 		TokenOp[] withdrawals
@@ -193,7 +195,7 @@ interface IExchange  {
 	/// @param isSigner Whethet the signer was set or cancelled
 	event SignerSet(
 		address indexed holder,
-		uint256 indexed subaccount,
+		ExchangeSubaccount indexed subaccount,
 		address signer,
 		bool isSigner
 	);
