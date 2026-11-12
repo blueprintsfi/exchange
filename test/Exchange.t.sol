@@ -180,7 +180,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	// Construct a dummy Swap
 	// 	Swap memory swap;
 	// 	swap.holder = user;
-	// 	swap.holderSubaccount = 0;
+	// 	swap.subaccount = 0;
 	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.to = user;
@@ -246,7 +246,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	// Construct a dummy Swap
 	// 	Swap memory swap;
 	// 	swap.holder = user;
-	// 	swap.holderSubaccount = 0;
+	// 	swap.subaccount = 0;
 	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.deadlineAndNonce = (block.timestamp + 1000) << 128 | 1;
@@ -498,7 +498,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 
 	// 	Swap memory swap;
 	// 	swap.holder = user;
-	// 	swap.holderSubaccount = 0;
+	// 	swap.subaccount = 0;
 	// 	swap.sequencer = sequencer;
 	// 	swap.delay = delay;
 	// 	swap.deadlineAndNonce = futureTime << 128 | 1;
@@ -839,7 +839,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	// Create a swap from subaccount 1 to subaccount 2
 	// 	Swap memory swap;
 	// 	swap.holder = user;
-	// 	swap.holderSubaccount = 1; // From subaccount 1
+	// 	swap.subaccount = 1; // From subaccount 1
 	// 	swap.to = user;
 	// 	swap.toSubaccount = 2; // To subaccount 2
 	// 	swap.sequencer = sequencer;
@@ -860,7 +860,7 @@ import {BlueprintManager, BlueprintCall, HashLib} from "../lib/core/src/Blueprin
 	// 	// Hash the swap and sign it
 	// 	bytes32 swapHash = TypedDataHashLib.hashSwap(
 	// 		swap.holder,
-	// 		swap.holderSubaccount,
+	// 		swap.subaccount,
 	// 		swap.to,
 	// 		swap.toSubaccount,
 	// 		sequencer,

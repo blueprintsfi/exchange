@@ -28,7 +28,7 @@ bytes32 constant WITHDRAW_TYPEHASH = keccak256(
 bytes32 constant SWAP_TYPEHASH = keccak256(
 	"Swap("
 		"address holder,"
-		"uint256 holderSubaccount,"
+		"uint256 subaccount,"
 		"address operator,"
 		"uint256 delay,"
 		"address to,"
