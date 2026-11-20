@@ -110,16 +110,15 @@ contract Exchange is IExchange, EIP712 {
 	function withdraw(
 		BalanceInfo calldata info,
 		uint256 nonce,
-		TokenOp[] calldata withdrawals,
-		bytes calldata signature
+		TokenOp[] calldata withdrawals
 	) external {
 		if (!authorizedDelay(info)) {
-			bytes32 withdrawalHash = hashWithdrawal(info, nonce, withdrawals);
-			if (!isValidSig(info.sequencer, _hashTypedData(withdrawalHash), signature))
-				revert InvalidSignature();
+			revert Unauthorized();
 		}
 
-		if (userData[info.holder][info.sequencer].nonce >= nonce)
+		uint256 currentNonce = userData[info.holder][info.sequencer].nonce;
+		// limit the increment in the nonce to make DoS impossible
+		if (currentNonce >= nonce || currentNonce + type(uint32).max <= nonce)
 			revert InvalidNonce();
 
 		userData[info.holder][info.sequencer].nonce = nonce;
