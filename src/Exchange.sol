@@ -112,9 +112,8 @@ contract Exchange is IExchange, EIP712 {
 		uint256 nonce,
 		TokenOp[] calldata withdrawals
 	) external {
-		if (!authorizedDelay(info)) {
+		if (!authorizedDelay(info))
 			revert Unauthorized();
-		}
 
 		uint256 currentNonce = userData[info.holder][info.sequencer].nonce;
 		// limit the increment in the nonce to make DoS impossible
