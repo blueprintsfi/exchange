@@ -210,31 +210,31 @@ contract Exchange is IExchange, EIP712 {
 			}
 			emit OrderSwapped(holder, orderId, newFill);
 
-			TokenOp[] memory inputs = new TokenOp[](swap.inputs.length);
-			for (uint256 j = 0; j < inputs.length; j++) {
-				uint256 amount = swap.inputs[j].amount;
-				inputs[j] = TokenOp({
-					tokenId: swap.inputs[j].tokenId,
-					amount: Math.fullMulDiv(amount, newFill, denominator)
-						- Math.fullMulDiv(amount, previousFill, denominator)
-				});
-			}
-			manager.flashTransferFrom(address(this), fromExtSubaccount, address(this), sequencerExtSubaccount, inputs);
-
 			TokenOp[] memory outputs = new TokenOp[](swap.outputs.length);
-			// negate fills to easily round up - they are now amounts remaining
-			newFill = denominator - newFill;
-			previousFill = denominator - previousFill;
 			for (uint256 j = 0; j < outputs.length; j++) {
 				uint256 amount = swap.outputs[j].amount;
 				outputs[j] = TokenOp({
 					tokenId: swap.outputs[j].tokenId,
+					amount: Math.fullMulDiv(amount, newFill, denominator)
+						- Math.fullMulDiv(amount, previousFill, denominator)
+				});
+			}
+			manager.flashTransferFrom(address(this), sequencerExtSubaccount, swap.to, swap.toSubaccount, outputs);
+
+			TokenOp[] memory inputs = new TokenOp[](swap.inputs.length);
+			// flip fills to easily round up - they are now amounts remaining
+			newFill = denominator - newFill;
+			previousFill = denominator - previousFill;
+			for (uint256 j = 0; j < inputs.length; j++) {
+				uint256 amount = swap.inputs[j].amount;
+				inputs[j] = TokenOp({
+					tokenId: swap.inputs[j].tokenId,
 					// amount remaining before minus amount remaining after swap
 					amount: Math.fullMulDiv(amount, previousFill, denominator)
 						- Math.fullMulDiv(amount, newFill, denominator)
 				});
 			}
-			manager.flashTransferFrom(address(this), sequencerExtSubaccount, swap.to, swap.toSubaccount, outputs);
+			manager.flashTransferFrom(address(this), fromExtSubaccount, address(this), sequencerExtSubaccount, inputs);
 		}
 	}
 
