@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {SwapExecution, BalanceInfo, TokenOp, ExchangeSubaccount} from "../interfaces/IExchange.sol";
+import {OrderExecution, TokenOp, Label} from "../interfaces/IExchange.sol";
 
 bytes32 constant TOKENOP_TYPEHASH = keccak256(
 	"TokenOp("
@@ -10,11 +10,11 @@ bytes32 constant TOKENOP_TYPEHASH = keccak256(
 	")"
 );
 
-bytes32 constant SWAP_TYPEHASH = keccak256(
-	"Swap("
+bytes32 constant ORDER_TYPEHASH = keccak256(
+	"Order("
 		"address holder,"
-		"uint256 subaccount,"
-		"address operator,"
+		"uint256 label,"
+		"address sequencer,"
 		"uint256 delay,"
 		"address to,"
 		"uint256 toSubaccount,"
@@ -30,13 +30,13 @@ bytes32 constant SWAP_TYPEHASH = keccak256(
 	")"
 );
 
-bytes32 constant SET_SIGNER_TYPEHASH = keccak256(
-	"SetSigner("
+bytes32 constant SET_DELEGATED_SIGNER_TYPEHASH = keccak256(
+	"SetDelegatedSigner("
 		"address holder,"
-		"uint256 subaccount,"
-		"address signer,"
+		"uint256 label,"
+		"address delegatedSigner,"
 		"uint256 deadline,"
-		"bool isSigner"
+		"bool isActive"
 	")"
 );
 
@@ -63,48 +63,48 @@ function hashTokenOps(TokenOp[] calldata ops) pure returns (bytes32 result) {
 	}
 }
 
-function hashSwap(address operator, SwapExecution calldata swap) pure returns (bytes32 result) {
-	bytes32 inputsHash = hashTokenOps(swap.inputs);
-	bytes32 outputsHash = hashTokenOps(swap.outputs);
-	bytes32 typehash = SWAP_TYPEHASH;
+function hashOrder(address sequencer, OrderExecution calldata order) pure returns (bytes32 result) {
+	bytes32 inputsHash = hashTokenOps(order.inputs);
+	bytes32 outputsHash = hashTokenOps(order.outputs);
+	bytes32 typehash = ORDER_TYPEHASH;
 
 	assembly ("memory-safe") {
 		let ptr := mload(0x40)
 		mstore(ptr, typehash)
-		mstore(add(ptr, 0x20), and(calldataload(swap), ADDRESS_MASK)) // holder
-		mstore(add(ptr, 0x40), calldataload(add(swap, 0x20))) // exchangeSubaccount
-		mstore(add(ptr, 0x60), and(operator, ADDRESS_MASK))
-		mstore(add(ptr, 0x80), calldataload(add(swap, 0x40))) // delay
-		mstore(add(ptr, 0xa0), and(calldataload(add(swap, 0x60)), ADDRESS_MASK)) // to
-		// mstore(add(ptr, 0xc0), calldataload(add(swap, 0x80))) // toSubaccount
-		// mstore(add(ptr, 0xe0), calldataload(add(swap, 0xa0))) // deadlineAndNonce
-		// mstore(add(ptr, 0x100), calldataload(add(swap, 0xc0))) // fillDenominator
-		// mstore(add(ptr, 0x120), calldataload(add(swap, 0xe0))) // auxData
+		mstore(add(ptr, 0x20), and(calldataload(order), ADDRESS_MASK)) // holder
+		mstore(add(ptr, 0x40), calldataload(add(order, 0x20))) // label
+		mstore(add(ptr, 0x60), and(sequencer, ADDRESS_MASK))
+		mstore(add(ptr, 0x80), calldataload(add(order, 0x40))) // delay
+		mstore(add(ptr, 0xa0), and(calldataload(add(order, 0x60)), ADDRESS_MASK)) // to
+		// mstore(add(ptr, 0xc0), calldataload(add(order, 0x80))) // toSubaccount
+		// mstore(add(ptr, 0xe0), calldataload(add(order, 0xa0))) // deadlineAndNonce
+		// mstore(add(ptr, 0x100), calldataload(add(order, 0xc0))) // fillDenominator
+		// mstore(add(ptr, 0x120), calldataload(add(order, 0xe0))) // auxData
 		// the above lines are expressed as:
-		calldatacopy(add(ptr, 0xc0), add(swap, 0x80), 0x80)
+		calldatacopy(add(ptr, 0xc0), add(order, 0x80), 0x80)
 		mstore(add(ptr, 0x140), inputsHash)
 		mstore(add(ptr, 0x160), outputsHash)
 		result := keccak256(ptr, 0x180)
 	}
 }
 
-function hashSetSigner(
+function hashSetDelegatedSigner(
 	address holder,
-	ExchangeSubaccount subaccount,
-	address signer,
+	Label label,
+	address delegatedSigner,
 	uint256 deadline,
-	bool isSigner
+	bool isActive
 ) pure returns (bytes32 result) {
-	bytes32 typehash = SET_SIGNER_TYPEHASH;
+	bytes32 typehash = SET_DELEGATED_SIGNER_TYPEHASH;
 
 	assembly ("memory-safe") {
 		let ptr := mload(0x40)
 		mstore(ptr, typehash)
 		mstore(add(ptr, 0x20), and(holder, ADDRESS_MASK))
-		mstore(add(ptr, 0x40), subaccount)
-		mstore(add(ptr, 0x60), and(signer, ADDRESS_MASK))
+		mstore(add(ptr, 0x40), label)
+		mstore(add(ptr, 0x60), and(delegatedSigner, ADDRESS_MASK))
 		mstore(add(ptr, 0x80), deadline)
-		mstore(add(ptr, 0xa0), iszero(iszero(isSigner)))
+		mstore(add(ptr, 0xa0), iszero(iszero(isActive)))
 		result := keccak256(ptr, 0xc0)
 	}
 }

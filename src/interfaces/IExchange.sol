@@ -3,12 +3,12 @@ pragma solidity ^0.8.13;
 
 import {TokenOp} from "core/interfaces/IBlueprintManager.sol";
 
-type ExchangeSubaccount is uint256;
+type Label is uint256;
 
-// note: for eip-712 documentation only, not used in code
-struct Swap {
+// for eip-712 documentation only, not used in code
+struct Order {
 	address holder;
-	ExchangeSubaccount subaccount;
+	Label label;
 	address sequencer;
 	uint256 delay;
 	address to;
@@ -20,16 +20,16 @@ struct Swap {
 	TokenOp[] outputs;
 }
 
-struct BalanceInfo {
+struct Account {
 	address holder;
-	ExchangeSubaccount subaccount;
+	Label label;
 	address sequencer;
 	uint256 delay;
 }
 
-struct SwapExecution {
+struct OrderExecution {
 	address holder;
-	ExchangeSubaccount subaccount;
+	Label label;
 	// address sequencer; // inferred from the execution context as msg.sender
 	uint256 delay;
 	address to;
@@ -40,7 +40,7 @@ struct SwapExecution {
 	TokenOp[] inputs;
 	TokenOp[] outputs;
 	// execution details
-	uint256 output;
+	uint256 fillIncrease;
 	address signer;
 	bytes signature;
 }
@@ -50,19 +50,14 @@ struct SequencerTransfer {
 	TokenOp[] amounts;
 }
 
-struct UserData {
-	uint256 nonce;
-	uint256 ragequitTime;
-}
-
 /// @title Interface for Exchange
 /// @notice Contains all errors and events for the Exchange contract
 interface IExchange  {
 	/// @notice Thrown when an unauthorized account tries to act on behalf of a holder
 	error Unauthorized();
 
-	/// @notice Thrown when trying to remove a signer that isn't a signer (it may have been one)
-	error NotSigner();
+	/// @notice Thrown when trying to remove a delegated signer that isn't active (it may have been one)
+	error NotDelegatedSigner();
 
 	/// @notice Thrown when trying to fill an order with a signature from a signer that lacks access
 	error InvalidSigner();
@@ -73,29 +68,8 @@ interface IExchange  {
 	/// @notice Thrown when no ragequit is set
 	error NoRagequitSet();
 
-	/// @notice Thrown when trying to withdraw before delay has passed
-	error DelayNotPassed();
-
-	/// @notice Thrown when trying to fill beyond the maximum amount
-	error ExceedsMaxFill();
-
-	/// @notice Thrown when trying to initialize cancellation for an order with already initialized cancellation
-	error OrderCancelAlreadyInitialized();
-
-	/// @notice Thrown when trying to cancel an order without previous initCancel() call
-	error OrderCancelNotInitialized();
-
-	/// @notice Thrown when trying to cancel an order that hasn't been marked for cancellation
-	error NotMarkedForCancellation();
-
-	/// @notice Thrown when trying to declare a subaccount that already has a master
-	error SubaccountAlreadyDeclared();
-
 	/// @notice Thrown when an order has expired
 	error OrderExpired();
-
-	/// @notice Thrown when trying to execute a swap with wrong sequencer
-	error WrongSequencer();
 
 	/// @notice Thrown the fill denominator is too large or zero
 	error InvalidFillDenominator();
@@ -106,23 +80,8 @@ interface IExchange  {
 	/// @notice Thrown when signature verification fails
 	error InvalidSignature();
 
-	/// @notice Thrown when the nonce provided is invalid
-	error InvalidNonce();
-
-	/// @notice Thrown when the subaccount declaration with a signature passed the deadline
+	/// @notice Thrown when the delegated signer update with a signature passed the deadline
 	error DeadlinePassed();
-
-	/// @notice Emitted when tokens are deposited into the exchange
-	/// @param depositFor The address receiving the deposit
-	/// @param sequencer The sequencer address
-	/// @param delay The delay period for the deposit
-	/// @param deposits Array of token operations containing deposit details
-	event Deposit(
-		address indexed depositFor,
-		address indexed sequencer,
-		uint256 indexed delay,
-		TokenOp[] deposits
-	);
 
 	/// @notice Emitted when a user initiates ragequit
 	/// @param holder The address initiating ragequit
@@ -146,29 +105,19 @@ interface IExchange  {
 		address sender
 	);
 
-	/// @notice Emitted when an order is signed
-	/// @param signer The account signing the orders
-	/// @param holder The address signing the order
-	/// @param orderIds Order ids that were signed
-	event OrdersSigned(
-		address indexed signer,
-		address indexed holder,
-		bytes32[] orderIds
-	);
-
 	/// @notice Emitted when an order is canceled
-	/// @param holder The address that owns the order
+	/// @param holder The holder of the order's account
 	/// @param orderIds Order ids that were canceled
 	event OrdersCanceled(
 		address indexed holder,
 		bytes32[] orderIds
 	);
 
-	/// @notice Emitted when an order is filled via swap
-	/// @param holder The address that owns the order
+	/// @notice Emitted when an order is filled
+	/// @param holder The holder of the order's account
 	/// @param orderId The unique identifier of the order
 	/// @param fill The new fill
-	event OrderSwapped(
+	event OrderFilled(
 		address indexed holder,
 		bytes32 indexed orderId,
 		uint256 fill
@@ -176,27 +125,27 @@ interface IExchange  {
 
 	/// @notice Emitted when a withdrawal is performed
 	/// @param holder The address withdrawing funds
-	/// @param subaccount The subaccount identifier
+	/// @param label The account's label
 	/// @param sequencer The sequencer address
 	/// @param delay The delay period
 	/// @param withdrawals Array of token operations being withdrawn
 	event Withdraw(
 		address indexed holder,
-		ExchangeSubaccount indexed subaccount,
+		Label indexed label,
 		address indexed sequencer,
 		uint256 delay,
 		TokenOp[] withdrawals
 	);
 
-	/// @notice Emitted when a signer is added to a subaccount
+	/// @notice Emitted when a delegated signer is set for a holder and label
 	/// @param holder The address of the account holder
-	/// @param subaccount The subaccount identifier
-	/// @param signer The address being added as a signer
-	/// @param isSigner Whethet the signer was set or cancelled
-	event SignerSet(
+	/// @param label The label the delegated signer applies to
+	/// @param delegatedSigner The address being set as a delegated signer
+	/// @param isActive Whether the delegated signer was set or revoked
+	event DelegatedSignerSet(
 		address indexed holder,
-		ExchangeSubaccount indexed subaccount,
-		address signer,
-		bool isSigner
+		Label indexed label,
+		address delegatedSigner,
+		bool isActive
 	);
 }
