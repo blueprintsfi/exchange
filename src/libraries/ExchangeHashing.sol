@@ -10,21 +10,6 @@ bytes32 constant TOKENOP_TYPEHASH = keccak256(
 	")"
 );
 
-bytes32 constant WITHDRAW_TYPEHASH = keccak256(
-	"Withdraw("
-		"address holder,"
-		"uint256 subaccount,"
-		"address operator,"
-		"uint256 delay,"
-		"uint256 nonce,"
-		"TokenOp[] withdrawals"
-	")"
-	"TokenOp("
-		"uint256 tokenId,"
-		"uint256 amount"
-	")"
-);
-
 bytes32 constant SWAP_TYPEHASH = keccak256(
 	"Swap("
 		"address holder,"
@@ -75,27 +60,6 @@ function hashTokenOps(TokenOp[] calldata ops) pure returns (bytes32 result) {
 		}
 
 		result := keccak256(ptr, hashLen)
-	}
-}
-
-function hashWithdrawal(
-	BalanceInfo calldata info,
-	uint256 nonce,
-	TokenOp[] calldata withdrawals
-) pure returns (bytes32 result) {
-	bytes32 withdrawalsHash = hashTokenOps(withdrawals);
-	bytes32 typehash = WITHDRAW_TYPEHASH;
-
-	assembly ("memory-safe") {
-		let ptr := mload(0x40)
-		mstore(ptr, typehash)
-		mstore(add(ptr, 0x20), and(calldataload(info), ADDRESS_MASK))
-		mstore(add(ptr, 0x40), calldataload(add(info, 0x20)))
-		mstore(add(ptr, 0x60), and(calldataload(add(info, 0x40)), ADDRESS_MASK))
-		mstore(add(ptr, 0x80), calldataload(add(info, 0x60)))
-		mstore(add(ptr, 0xa0), nonce)
-		mstore(add(ptr, 0xc0), withdrawalsHash)
-		result := keccak256(ptr, 0xe0)
 	}
 }
 
